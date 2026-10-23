@@ -1,0 +1,1503 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@source "../app";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+* {
+  scroll-behavior: smooth;
+}
+
+@theme inline {
+  /* --font-active is the platform font, always set on <html> by
+     app/layout.tsx (the teacher's pick, else DEFAULT_FONT in
+     src/config/fonts.ts), which also inlines its @font-face rules. */
+  --font-sans: var(--font-active), system-ui, sans-serif;
+  --font-display: var(--font-active), system-ui, sans-serif;
+
+  /* Text sizes follow --font-scale, the active font's size correction (see
+     FONT_META in src/config/fonts.ts). Fonts differ a lot in width (Lemonada
+     is ~30% wider than Cairo, Beiruti ~25% narrower), so each font is scaled
+     to take about the same room. Line breaks and layouts then hold whatever
+     font is picked. Only type scales; spacing stays in plain rem. */
+  --text-xs: calc(0.75rem * var(--font-scale, 1));
+  --text-sm: calc(0.875rem * var(--font-scale, 1));
+  --text-base: calc(1rem * var(--font-scale, 1));
+  --text-lg: calc(1.125rem * var(--font-scale, 1));
+  --text-xl: calc(1.25rem * var(--font-scale, 1));
+  --text-2xl: calc(1.5rem * var(--font-scale, 1));
+  --text-3xl: calc(1.875rem * var(--font-scale, 1));
+  --text-4xl: calc(2.25rem * var(--font-scale, 1));
+  --text-5xl: calc(3rem * var(--font-scale, 1));
+  --text-6xl: calc(3.75rem * var(--font-scale, 1));
+  --text-7xl: calc(4.5rem * var(--font-scale, 1));
+
+  /* Line-heights never drop below --font-leading, the active font's
+     "lines don't touch" minimum (FONT_META.leading in src/config/fonts.ts).
+     The design values stay wherever they already give enough room; tall
+     fonts (Lemonada, Alexandria…) and Tailwind's tight heading defaults
+     (1–1.2, made for Latin) are raised just enough. */
+  --leading-tight: max(1.25, var(--font-leading, 0));
+  --leading-snug: max(1.375, var(--font-leading, 0));
+  --leading-normal: max(1.5, var(--font-leading, 0));
+  --leading-relaxed: max(1.625, var(--font-leading, 0));
+  --leading-loose: max(2, var(--font-leading, 0));
+  --text-xs--line-height: max(calc(1 / 0.75), var(--font-leading, 0));
+  --text-sm--line-height: max(calc(1.25 / 0.875), var(--font-leading, 0));
+  --text-base--line-height: max(1.5, var(--font-leading, 0));
+  --text-lg--line-height: max(calc(1.75 / 1.125), var(--font-leading, 0));
+  --text-xl--line-height: max(calc(1.75 / 1.25), var(--font-leading, 0));
+  --text-2xl--line-height: max(calc(2 / 1.5), var(--font-leading, 0));
+  --text-3xl--line-height: max(calc(2.25 / 1.875), var(--font-leading, 0));
+  --text-4xl--line-height: max(calc(2.5 / 2.25), var(--font-leading, 0));
+  --text-5xl--line-height: max(1, var(--font-leading, 0));
+  --text-6xl--line-height: max(1, var(--font-leading, 0));
+  --text-7xl--line-height: max(1, var(--font-leading, 0));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand — primary hue, a contrasting highlight hue and a third "life" tint */
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-deep: var(--brand-deep);
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-deep: var(--highlight-deep);
+  --color-tertiary: var(--tertiary);
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-deep: var(--surface-deep);
+
+  --color-stage-1: var(--stage-1);
+  --color-stage-2: var(--stage-2);
+  --color-stage-3: var(--stage-3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COLOR PALETTES
+   The teacher picks the palette in the admin panel (see src/config/theme.ts),
+   which sets <html data-palette="…">; green is also the bare :root fallback. Each palette defines ONLY raw colors, for
+   light mode and for dark mode (.dark on <html>). Gradients, shadows and glows
+   are derived from these in the "DERIVED TOKENS" block below, so a new palette
+   is just two blocks of colors.
+
+   Stage colors: stage-1 = تالتة إعدادي · stage-2 = أولى ثانوي · stage-3 = تالتة ثانوي
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── GREEN · light ── deep forest green + copper highlight on soft ivory (default) ── */
+:root,
+:root[data-palette="green"] {
+  --background: oklch(0.974 0.012 100);
+  --foreground: oklch(0.22 0.045 160);
+  --card: oklch(0.993 0.006 100);
+
+  --primary: oklch(0.42 0.1 158);
+  --primary-foreground: oklch(0.985 0.01 100);
+  --secondary: oklch(0.95 0.02 120);
+  --secondary-foreground: oklch(0.27 0.05 160);
+  --muted: oklch(0.935 0.018 115);
+  --muted-foreground: oklch(0.45 0.035 160);
+  --accent: oklch(0.93 0.035 50);
+  --accent-foreground: oklch(0.42 0.11 45);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(0.98 0.008 90);
+  --border: oklch(0.87 0.02 120);
+  --input: oklch(0.945 0.016 115);
+
+  --brand: oklch(0.42 0.1 158);
+  --brand-soft: oklch(0.62 0.1 155);
+  --brand-deep: oklch(0.29 0.07 162);
+  --highlight: oklch(0.56 0.13 48);
+  --highlight-soft: oklch(0.7 0.11 55);
+  --highlight-deep: oklch(0.42 0.1 42);
+  --tertiary: oklch(0.55 0.1 130);
+
+  --ink: oklch(0.2 0.04 160);
+  --surface: oklch(0.974 0.012 100);
+  --surface-deep: oklch(0.935 0.02 110);
+
+  --stage-1: oklch(0.45 0.1 158);
+  --stage-2: oklch(0.55 0.12 48);
+  --stage-3: oklch(0.48 0.08 200);
+
+  --brand-from: oklch(0.5 0.11 155);
+  --brand-to: oklch(0.32 0.08 162);
+  --brand-deep-from: oklch(0.36 0.08 160);
+  --brand-deep-to: oklch(0.24 0.05 165);
+  --highlight-from: oklch(0.62 0.13 52);
+  --highlight-to: oklch(0.45 0.11 40);
+  --hero-glow-a: oklch(0.42 0.1 158 / 0.14);
+  --hero-glow-b: oklch(0.56 0.13 48 / 0.1);
+  --hero-bg-from: oklch(0.974 0.012 100);
+  --hero-bg-to: oklch(0.945 0.02 105);
+  --card-from: oklch(1 0 0 / 0.96);
+  --card-to: oklch(0.965 0.016 105 / 0.85);
+  --stage-1-from: oklch(0.5 0.11 155);
+  --stage-1-to: oklch(0.3 0.08 162);
+  --stage-2-from: oklch(0.6 0.13 50);
+  --stage-2-to: oklch(0.4 0.1 40);
+  --stage-3-from: oklch(0.5 0.08 195);
+  --stage-3-to: oklch(0.3 0.06 210);
+
+  --shadow-brand-color: oklch(0.29 0.07 162 / 0.42);
+  --shadow-highlight-color: oklch(0.42 0.1 42 / 0.4);
+  --shadow-elegant-color: oklch(0.2 0.04 160 / 0.2);
+  --shadow-soft-color: oklch(0.2 0.04 160 / 0.15);
+}
+
+/* ── GREEN · dark ── graphite surfaces, muted accents, easy on the eyes ── */
+:root.dark,
+:root[data-palette="green"].dark {
+  --background: oklch(0.185 0.006 160);
+  --foreground: oklch(0.93 0.008 70);
+  --card: oklch(0.218 0.007 160);
+
+  --primary: oklch(0.7 0.065 158);
+  --primary-foreground: oklch(0.19 0.015 158);
+  --secondary: oklch(0.255 0.007 160);
+  --secondary-foreground: oklch(0.9 0.008 70);
+  --muted: oklch(0.25 0.006 160);
+  --muted-foreground: oklch(0.7 0.012 160);
+  --accent: oklch(0.27 0.018 158);
+  --accent-foreground: oklch(0.88 0.03 158);
+  --destructive: oklch(0.64 0.14 28);
+  --destructive-foreground: oklch(0.96 0.006 70);
+  --border: oklch(0.29 0.008 160);
+  --input: oklch(0.26 0.007 160);
+
+  --brand: oklch(0.7 0.065 158);
+  --brand-soft: oklch(0.78 0.045 158);
+  --brand-deep: oklch(0.45 0.06 158);
+  --highlight: oklch(0.77 0.055 55);
+  --highlight-soft: oklch(0.84 0.042 55);
+  --highlight-deep: oklch(0.63 0.06 55);
+  --tertiary: oklch(0.72 0.045 130);
+
+  --ink: oklch(0.93 0.008 70);
+  --surface: oklch(0.185 0.006 160);
+  --surface-deep: oklch(0.16 0.006 160);
+
+  --stage-1: oklch(0.7 0.065 158);
+  --stage-2: oklch(0.77 0.055 55);
+  --stage-3: oklch(0.72 0.045 195);
+
+  --brand-from: oklch(0.62 0.075 158);
+  --brand-to: oklch(0.48 0.065 158);
+  --brand-deep-from: oklch(0.5 0.065 158);
+  --brand-deep-to: oklch(0.36 0.05 158);
+  --highlight-from: oklch(0.72 0.06 55);
+  --highlight-to: oklch(0.58 0.055 55);
+  --hero-glow-a: oklch(0.6 0.06 158 / 0.06);
+  --hero-glow-b: oklch(0.72 0.05 55 / 0.035);
+  --hero-bg-from: oklch(0.19 0.006 160);
+  --hero-bg-to: oklch(0.17 0.006 160);
+  --card-from: oklch(0.225 0.007 160 / 0.92);
+  --card-to: oklch(0.2 0.006 160 / 0.8);
+  --stage-1-from: oklch(0.42 0.065 158);
+  --stage-1-to: oklch(0.3 0.045 158);
+  --stage-2-from: oklch(0.5 0.055 55);
+  --stage-2-to: oklch(0.36 0.04 55);
+  --stage-3-from: oklch(0.42 0.045 195);
+  --stage-3-to: oklch(0.3 0.035 195);
+
+  --shadow-brand-color: oklch(0 0 0 / 0.45);
+  --shadow-highlight-color: oklch(0 0 0 / 0.4);
+  --shadow-elegant-color: oklch(0 0 0 / 0.5);
+  --shadow-soft-color: oklch(0 0 0 / 0.35);
+}
+
+/* ── BURGUNDY · light ── deep wine + champagne gold on warm ivory ── */
+:root[data-palette="burgundy"] {
+  --background: oklch(0.972 0.012 50);
+  --foreground: oklch(0.22 0.05 15);
+  --card: oklch(0.992 0.006 50);
+
+  --primary: oklch(0.4 0.12 12);
+  --primary-foreground: oklch(0.985 0.008 60);
+  --secondary: oklch(0.95 0.018 40);
+  --secondary-foreground: oklch(0.28 0.06 15);
+  --muted: oklch(0.935 0.016 40);
+  --muted-foreground: oklch(0.46 0.04 15);
+  --accent: oklch(0.93 0.04 80);
+  --accent-foreground: oklch(0.45 0.09 70);
+  --destructive: oklch(0.56 0.21 30);
+  --destructive-foreground: oklch(0.98 0.008 60);
+  --border: oklch(0.87 0.02 40);
+  --input: oklch(0.945 0.015 40);
+
+  --brand: oklch(0.4 0.12 12);
+  --brand-soft: oklch(0.6 0.105 15);
+  --brand-deep: oklch(0.29 0.085 10);
+  --highlight: oklch(0.57 0.085 72);
+  --highlight-soft: oklch(0.74 0.075 80);
+  --highlight-deep: oklch(0.44 0.072 66);
+  --tertiary: oklch(0.55 0.08 355);
+
+  --ink: oklch(0.2 0.05 15);
+  --surface: oklch(0.972 0.012 50);
+  --surface-deep: oklch(0.935 0.018 45);
+
+  --stage-1: oklch(0.42 0.12 12);
+  --stage-2: oklch(0.57 0.085 72);
+  --stage-3: oklch(0.45 0.07 250);
+
+  --brand-from: oklch(0.47 0.125 14);
+  --brand-to: oklch(0.31 0.095 10);
+  --brand-deep-from: oklch(0.34 0.12 12);
+  --brand-deep-to: oklch(0.22 0.08 8);
+  --highlight-from: oklch(0.64 0.09 78);
+  --highlight-to: oklch(0.48 0.078 66);
+  --hero-glow-a: oklch(0.4 0.14 12 / 0.12);
+  --hero-glow-b: oklch(0.6 0.11 75 / 0.12);
+  --hero-bg-from: oklch(0.972 0.012 50);
+  --hero-bg-to: oklch(0.945 0.02 45);
+  --card-from: oklch(1 0 0 / 0.96);
+  --card-to: oklch(0.965 0.014 45 / 0.85);
+  --stage-1-from: oklch(0.47 0.125 14);
+  --stage-1-to: oklch(0.31 0.095 10);
+  --stage-2-from: oklch(0.62 0.09 75);
+  --stage-2-to: oklch(0.43 0.078 64);
+  --stage-3-from: oklch(0.48 0.07 250);
+  --stage-3-to: oklch(0.3 0.06 260);
+
+  --shadow-brand-color: oklch(0.28 0.1 10 / 0.42);
+  --shadow-highlight-color: oklch(0.42 0.09 65 / 0.38);
+  --shadow-elegant-color: oklch(0.2 0.05 15 / 0.2);
+  --shadow-soft-color: oklch(0.2 0.05 15 / 0.15);
+}
+
+/* ── BURGUNDY · dark ── warm graphite + rich wine burgundy & champagne ── */
+:root[data-palette="burgundy"].dark {
+  --background: oklch(0.185 0.008 15);
+  --foreground: oklch(0.93 0.008 60);
+  --card: oklch(0.218 0.01 15);
+
+  --primary: oklch(0.67 0.1 12);
+  --primary-foreground: oklch(0.97 0.01 25);
+  --secondary: oklch(0.255 0.01 15);
+  --secondary-foreground: oklch(0.9 0.008 60);
+  --muted: oklch(0.25 0.009 15);
+  --muted-foreground: oklch(0.7 0.014 25);
+  --accent: oklch(0.27 0.035 12);
+  --accent-foreground: oklch(0.88 0.04 15);
+  --destructive: oklch(0.64 0.15 30);
+  --destructive-foreground: oklch(0.97 0.006 60);
+  --border: oklch(0.29 0.012 15);
+  --input: oklch(0.26 0.01 15);
+
+  --brand: oklch(0.67 0.1 12);
+  --brand-soft: oklch(0.76 0.075 12);
+  --brand-deep: oklch(0.43 0.125 14);
+  --highlight: oklch(0.77 0.055 78);
+  --highlight-soft: oklch(0.84 0.042 78);
+  --highlight-deep: oklch(0.63 0.06 74);
+  --tertiary: oklch(0.7 0.05 355);
+
+  --ink: oklch(0.93 0.008 60);
+  --surface: oklch(0.185 0.008 15);
+  --surface-deep: oklch(0.16 0.008 15);
+
+  --stage-1: oklch(0.67 0.1 12);
+  --stage-2: oklch(0.77 0.055 78);
+  --stage-3: oklch(0.72 0.045 250);
+
+  --brand-from: oklch(0.47 0.125 14);
+  --brand-to: oklch(0.36 0.1 12);
+  --brand-deep-from: oklch(0.44 0.11 12);
+  --brand-deep-to: oklch(0.32 0.085 10);
+  --highlight-from: oklch(0.72 0.06 78);
+  --highlight-to: oklch(0.58 0.055 72);
+  --hero-glow-a: oklch(0.5 0.12 12 / 0.09);
+  --hero-glow-b: oklch(0.72 0.05 78 / 0.035);
+  --hero-bg-from: oklch(0.19 0.008 15);
+  --hero-bg-to: oklch(0.17 0.008 15);
+  --card-from: oklch(0.225 0.01 15 / 0.92);
+  --card-to: oklch(0.2 0.008 15 / 0.8);
+  --stage-1-from: oklch(0.44 0.11 12);
+  --stage-1-to: oklch(0.3 0.08 10);
+  --stage-2-from: oklch(0.5 0.055 78);
+  --stage-2-to: oklch(0.36 0.04 72);
+  --stage-3-from: oklch(0.42 0.045 250);
+  --stage-3-to: oklch(0.3 0.035 258);
+
+  --shadow-brand-color: oklch(0.22 0.07 12 / 0.55);
+  --shadow-highlight-color: oklch(0 0 0 / 0.4);
+  --shadow-elegant-color: oklch(0 0 0 / 0.5);
+  --shadow-soft-color: oklch(0 0 0 / 0.35);
+}
+
+/* The admin panel keeps its own font (--font-admin = ADMIN_FONT, set on
+   <html> by app/layout.tsx) whatever the teacher picks for the website.
+   !important beats the inline --font-active on <html>, and setting it on
+   <html> covers portals (toasts, dialogs) too. */
+html:has([data-admin-root]) {
+  --font-active: var(--font-admin) !important;
+  --font-scale: 1 !important;
+  --font-leading: 0 !important;
+}
+
+/* Burgundy at night uses two tones of the same wine: solid fills (buttons,
+   chips, nodes) take the deep burgundy with light text, while text accents
+   keep the lighter wine tint above so they stay readable on dark surfaces. */
+:root[data-palette="burgundy"].dark :is(.bg-primary, .bg-gradient-brand),
+:root[data-palette="burgundy"].dark .hover\:bg-primary:hover,
+:root[data-palette="burgundy"].dark .group:hover .group-hover\:bg-primary {
+  background-color: var(--brand-deep);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DERIVED TOKENS — computed from the active palette's raw colors.
+   Never put palette-specific values here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --radius: 1rem;
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --ring: var(--primary);
+
+  --gradient-hero:
+    radial-gradient(ellipse 75% 60% at 80% 20%, var(--hero-glow-a), transparent 60%),
+    radial-gradient(ellipse 55% 60% at 10% 90%, var(--hero-glow-b), transparent 60%),
+    linear-gradient(180deg, var(--hero-bg-from), var(--hero-bg-to));
+  --gradient-brand: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  --gradient-brand-deep: linear-gradient(
+    135deg,
+    var(--brand-deep-from),
+    var(--brand-deep-to)
+  );
+  --gradient-highlight: linear-gradient(
+    135deg,
+    var(--highlight-from),
+    var(--highlight-to)
+  );
+  --gradient-card: linear-gradient(160deg, var(--card-from), var(--card-to));
+  --gradient-stage-1: linear-gradient(135deg, var(--stage-1-from), var(--stage-1-to));
+  --gradient-stage-2: linear-gradient(135deg, var(--stage-2-from), var(--stage-2-to));
+  --gradient-stage-3: linear-gradient(135deg, var(--stage-3-from), var(--stage-3-to));
+
+  --shadow-brand: 0 10px 28px -16px var(--shadow-brand-color);
+  --shadow-highlight: 0 10px 28px -16px var(--shadow-highlight-color);
+  --shadow-elegant: 0 20px 60px -28px var(--shadow-elegant-color);
+  --shadow-soft: 0 8px 28px -16px var(--shadow-soft-color);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    direction: rtl;
+    background-color: var(--hero-bg-to);
+    /* Always reserve the scrollbar's space so the page never jumps sideways
+       when a scrollbar appears/disappears (page changes, content loading). */
+    scrollbar-gutter: stable;
+    /* No sideways panning / rubber-banding on touch devices: the page itself
+       only scrolls vertically (inner horizontal scrollers still work). */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  body {
+    isolation: isolate;
+    overscroll-behavior-x: none;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: calc(1rem * var(--font-scale, 1));
+    /* Text with no leading class inherits this; same floor as the tokens. */
+    line-height: max(1.5, var(--font-leading, 0));
+    font-feature-settings: "ss01", "kern";
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: clip;
+  }
+
+  /* Page backdrop on its own fixed, composited layer — scrolling never repaints it. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -50;
+    background: var(--gradient-hero);
+    pointer-events: none;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 32%, transparent);
+    color: var(--color-foreground);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUTTONS — «نواة على طبقات»
+   The platform's one button. A solid body rests on two thin rock strata (a
+   darker layer of its own colour, then a hairline of the highlight colour)
+   and sinks into them when pressed. The icon sits in a small "nucleus".
+
+     <Link className="btn btn-primary btn-lg">
+       <span className="btn-nucleus"><svg …/></span> ابدأ رحلتك
+     </Link>
+
+   Variants: .btn-primary | .btn-secondary | .btn-danger
+   Sizes:    .btn-sm | (default) | .btn-lg        Icon only: add .btn-icon
+   Every colour comes from the active palette, so buttons follow the
+   palette chosen in the admin panel and dark mode on their own. These sit in
+   the components layer, so utilities (w-full, hidden md:inline-flex, mt-4…)
+   still win when combined.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  .btn {
+    --btn-layer: 3px;
+    --btn-radius: 0.85rem;
+    --btn-fill: var(--primary);
+    --btn-ink: var(--primary-foreground);
+    --btn-rock: color-mix(in oklch, var(--btn-fill), black 30%);
+    --btn-sediment: var(--highlight);
+    --btn-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 1.25rem;
+    border: 0;
+    border-radius: var(--btn-radius);
+    font-family: inherit;
+    font-size: calc(0.875rem * var(--font-scale, 1));
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      translate 180ms var(--btn-ease),
+      box-shadow 180ms var(--btn-ease),
+      background-color 180ms ease,
+      color 180ms ease;
+  }
+
+  .dark .btn {
+    --btn-sediment: var(--highlight-deep);
+  }
+
+  /* Burgundy at night: solid fills use the deep wine (see the note above). */
+  :root[data-palette="burgundy"].dark .btn {
+    --btn-fill: var(--brand-deep);
+  }
+
+  /* Green: the bottom stratum (and the nucleus rim) stays green — its copper
+     highlight read as a stray burgundy line under a green button. */
+  :root[data-palette="green"] .btn {
+    --btn-sediment: color-mix(in oklch, var(--btn-fill), black 50%);
+  }
+
+  .btn-sm {
+    --btn-layer: 2px;
+    --btn-radius: 0.7rem;
+    gap: 0.45rem;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.9rem;
+    font-size: calc(0.8rem * var(--font-scale, 1));
+  }
+
+  .btn-lg {
+    --btn-layer: 4px;
+    --btn-radius: 1rem;
+    gap: 0.75rem;
+    min-height: 3.25rem;
+    padding: 0.7rem 1.75rem;
+    font-size: calc(1rem * var(--font-scale, 1));
+  }
+
+  .btn-icon {
+    width: 2.75rem;
+    padding: 0;
+  }
+  .btn-sm.btn-icon {
+    width: 2.25rem;
+  }
+  .btn-lg.btn-icon {
+    width: 3.25rem;
+  }
+
+  .btn svg {
+    flex: none;
+    width: 1.1em;
+    height: 1.1em;
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* ── Primary: the stone on its strata ─────────────────────────────────── */
+  .btn-primary {
+    background-color: var(--btn-fill);
+    color: var(--btn-ink);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, var(--btn-ink) 18%, transparent),
+      0 var(--btn-layer) 0 0 var(--btn-rock),
+      0 calc(var(--btn-layer) + 2px) 0 0 var(--btn-sediment),
+      0 calc(var(--btn-layer) + 10px) 18px -12px color-mix(in oklch, var(--btn-rock) 75%, transparent);
+  }
+
+  /* ── Secondary: a light outline on a single stratum ───────────────────── */
+  .btn-secondary,
+  .btn-danger {
+    --btn-edge: color-mix(in oklch, var(--primary) 28%, var(--border));
+    background-color: var(--card);
+    color: var(--foreground);
+    box-shadow:
+      inset 0 0 0 1.5px var(--btn-edge),
+      0 var(--btn-layer) 0 0 var(--btn-edge);
+  }
+
+  .btn-danger {
+    --btn-edge: color-mix(in oklch, var(--destructive) 38%, var(--border));
+    background-color: color-mix(in oklch, var(--destructive) 6%, var(--card));
+    color: var(--destructive);
+  }
+
+  /* Hover only where there is a real pointer — on phones a tap would leave
+     the button stuck in its hover state. */
+  @media (hover: hover) {
+    .btn-primary:not(:disabled):hover {
+      translate: 0 -1px;
+      /* lighter, but still the same wine (white would wash it out) */
+      background-color: color-mix(in oklch, var(--btn-fill), var(--brand-soft) 16%);
+      box-shadow:
+        inset 0 1px 0 color-mix(in oklch, var(--btn-ink) 22%, transparent),
+        0 calc(var(--btn-layer) + 1px) 0 0 var(--btn-rock),
+        0 calc(var(--btn-layer) + 3px) 0 0 var(--btn-sediment),
+        0 calc(var(--btn-layer) + 14px) 22px -12px color-mix(in oklch, var(--btn-rock) 80%, transparent);
+    }
+
+    .btn-secondary:not(:disabled):hover,
+    .btn-danger:not(:disabled):hover {
+      translate: 0 -1px;
+      box-shadow:
+        inset 0 0 0 1.5px var(--btn-edge),
+        0 calc(var(--btn-layer) + 1px) 0 0 var(--btn-edge);
+    }
+
+    .btn-secondary:not(:disabled):hover {
+      --btn-edge: color-mix(in oklch, var(--primary) 55%, var(--border));
+      color: var(--primary);
+    }
+
+    .btn-danger:not(:disabled):hover {
+      --btn-edge: color-mix(in oklch, var(--destructive) 60%, var(--border));
+    }
+
+    .btn:not(:disabled):hover .btn-nucleus svg {
+      translate: -2px 0;
+    }
+  }
+
+  /* Pressed — after the hover rules so it wins while the pointer is on it. */
+  .btn-primary:not(:disabled):active {
+    translate: 0 var(--btn-layer);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, var(--btn-ink) 12%, transparent),
+      0 0 0 0 var(--btn-rock),
+      0 2px 0 0 var(--btn-sediment),
+      0 4px 8px -6px color-mix(in oklch, var(--btn-rock) 60%, transparent);
+  }
+
+  .btn-secondary:not(:disabled):active,
+  .btn-danger:not(:disabled):active {
+    translate: 0 var(--btn-layer);
+    box-shadow:
+      inset 0 0 0 1.5px var(--btn-edge),
+      0 0 0 0 var(--btn-edge);
+  }
+
+  /* ── The nucleus: the icon's chamber on primary buttons ──────────────── */
+  .btn-nucleus {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    margin-inline-start: -0.85rem;
+    border-radius: 0.55rem 0.7rem 0.55rem 0.7rem;
+    background-color: color-mix(in oklch, var(--btn-rock) 70%, var(--btn-fill));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--btn-sediment) 45%, transparent);
+  }
+
+  .btn-sm .btn-nucleus {
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-inline-start: -0.6rem;
+    border-radius: 0.45rem 0.55rem 0.45rem 0.55rem;
+  }
+
+  .btn-lg .btn-nucleus {
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-inline-start: -1.3rem;
+    border-radius: 0.7rem 0.85rem 0.7rem 0.85rem;
+  }
+
+  .btn .btn-nucleus svg {
+    width: 1rem;
+    height: 1rem;
+    transition: translate 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .btn-sm .btn-nucleus svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn,
+    .btn .btn-nucleus svg {
+      transition: none;
+    }
+    .btn:not(:disabled):hover,
+    .btn:not(:disabled):active,
+    .btn:not(:disabled):hover .btn-nucleus svg {
+      translate: none;
+    }
+  }
+}
+
+@layer utilities {
+  /* Brand accents are deliberately SOLID colors — repeated gradients read as
+     "generated". The class names stay so every page follows from here. */
+  .text-gradient-brand,
+  .text-gradient-bio {
+    color: var(--primary);
+  }
+
+  .text-gradient-highlight {
+    color: var(--highlight);
+  }
+
+  .bg-gradient-brand {
+    background-color: var(--primary);
+  }
+
+  .bg-gradient-brand-deep {
+    background-color: var(--brand-deep);
+  }
+
+  .bg-gradient-highlight {
+    background-color: var(--highlight);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .shadow-brand {
+    box-shadow: var(--shadow-brand);
+  }
+
+  .shadow-highlight {
+    box-shadow: var(--shadow-highlight);
+  }
+
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .glow-brand {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--brand) 30%, transparent),
+      0 0 48px color-mix(in oklab, var(--brand) 28%, transparent);
+  }
+
+  .glow-highlight {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--highlight) 30%, transparent),
+      0 0 48px color-mix(in oklab, var(--highlight) 28%, transparent);
+  }
+
+  .border-gradient-bio {
+    border: 1px solid var(--border);
+    background-color: var(--card);
+  }
+
+  /* ── Motion ── */
+
+  @keyframes marquee-rtl {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee-rtl 38s linear infinite;
+  }
+
+  @keyframes float-soft {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  .animate-float {
+    animation: float-soft 6s ease-in-out infinite;
+  }
+
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-spin-slow {
+    animation: spin-slow 40s linear infinite;
+  }
+  .animate-spin-reverse {
+    animation: spin-slow 50s linear infinite reverse;
+  }
+
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
+  .animate-pulse-soft {
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  /* Organic "cell membrane" wobble for blob shapes */
+  @keyframes membrane {
+    0%,
+    100% {
+      transform: rotate(0deg) scale(1);
+    }
+    50% {
+      transform: rotate(14deg) scale(1.04, 0.97);
+    }
+  }
+  .animate-membrane {
+    border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
+    animation: membrane 14s ease-in-out infinite;
+  }
+
+  /* Mini cell used in badges: sways gently while the nucleus breathes
+     (see MiniCell.tsx). */
+  @keyframes cell-sway {
+    0%,
+    100% {
+      transform: rotate(-8deg) scale(1);
+    }
+    50% {
+      transform: rotate(8deg) scale(1.05);
+    }
+  }
+  @keyframes cell-nucleus {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.14);
+    }
+  }
+  .cell-sway,
+  .cell-nucleus {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .cell-sway {
+    animation-name: cell-sway;
+    animation-duration: 5s;
+  }
+  .cell-nucleus {
+    animation-name: cell-nucleus;
+    animation-duration: 2.5s;
+  }
+
+  /* Slow organic wander (specimens drifting in "fluid") */
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    25% {
+      transform: translate3d(8px, -14px, 0) rotate(6deg);
+    }
+    50% {
+      transform: translate3d(-6px, -22px, 0) rotate(-4deg);
+    }
+    75% {
+      transform: translate3d(-10px, -8px, 0) rotate(3deg);
+    }
+  }
+  .animate-drift {
+    animation: drift 16s ease-in-out infinite;
+  }
+
+  /* Leaves swaying on a stem */
+  @keyframes sway {
+    0%,
+    100% {
+      transform: rotate(-5deg);
+    }
+    50% {
+      transform: rotate(5deg);
+    }
+  }
+  .animate-sway {
+    animation: sway 7s ease-in-out infinite;
+  }
+
+  /* Tiny particles rising like bubbles / spores */
+  @keyframes rise {
+    0% {
+      transform: translateY(0) scale(0.6);
+      opacity: 0;
+    }
+    15% {
+      opacity: 0.9;
+    }
+    85% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translateY(-220px) scale(1);
+      opacity: 0;
+    }
+  }
+  .animate-rise {
+    animation: rise 9s ease-in infinite;
+  }
+
+  /* Expanding ring, like a cell signal / sonar ping */
+  @keyframes ripple {
+    0% {
+      transform: scale(0.85);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+  .animate-ripple {
+    animation: ripple 3.6s ease-out infinite;
+  }
+
+  /* DNA helix (see DnaHelix.tsx). Keyframes sample a cosine so the linear
+     timing reads as a smooth rotation; scale/opacity fake the depth. */
+  @keyframes dna-dot {
+    0% {
+      transform: translateX(-28px) scale(0.9);
+      opacity: 0.75;
+    }
+    12.5% {
+      transform: translateX(-19.8px) scale(1.08);
+      opacity: 0.93;
+    }
+    25% {
+      transform: translateX(0) scale(1.15);
+      opacity: 1;
+    }
+    37.5% {
+      transform: translateX(19.8px) scale(1.08);
+      opacity: 0.93;
+    }
+    50% {
+      transform: translateX(28px) scale(0.9);
+      opacity: 0.75;
+    }
+    62.5% {
+      transform: translateX(19.8px) scale(0.72);
+      opacity: 0.55;
+    }
+    75% {
+      transform: translateX(0) scale(0.65);
+      opacity: 0.45;
+    }
+    87.5% {
+      transform: translateX(-19.8px) scale(0.72);
+      opacity: 0.55;
+    }
+    100% {
+      transform: translateX(-28px) scale(0.9);
+      opacity: 0.75;
+    }
+  }
+  @keyframes dna-bar {
+    0%,
+    100% {
+      transform: scaleX(1);
+    }
+    12.5%,
+    87.5% {
+      transform: scaleX(0.707);
+    }
+    25%,
+    75% {
+      transform: scaleX(0);
+    }
+    37.5%,
+    62.5% {
+      transform: scaleX(-0.707);
+    }
+    50% {
+      transform: scaleX(-1);
+    }
+  }
+  .dna-dot,
+  .dna-bar {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  .dna-dot {
+    animation-name: dna-dot;
+  }
+  .dna-paused .dna-dot,
+  .dna-paused .dna-bar {
+    animation-play-state: paused;
+  }
+  .dna-bar {
+    animation-name: dna-bar;
+  }
+
+  /* Light sweep across a surface on hover */
+  @keyframes shine {
+    0% {
+      transform: translateX(-120%) skewX(-15deg);
+    }
+    100% {
+      transform: translateX(220%) skewX(-15deg);
+    }
+  }
+  .animate-shine {
+    animation: shine 1.1s ease-in-out;
+  }
+}
+
+/* Respect users who ask the OS for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PLYR VIDEO PLAYER — Custom Theme
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Container */
+.plyr-container {
+  --plyr-color-main: var(--primary);
+  --plyr-video-background: #000;
+  --plyr-menu-background: var(--card);
+  --plyr-menu-color: var(--foreground);
+  --plyr-menu-border-color: var(--border);
+  --plyr-badge-background: var(--primary);
+  --plyr-badge-text-color: var(--primary-foreground);
+  --plyr-badge-border-radius: 0.5rem;
+  --plyr-tooltip-background: var(--card);
+  --plyr-tooltip-color: var(--foreground);
+  --plyr-tooltip-radius: 0.5rem;
+  --plyr-font-family: var(--font-sans);
+  --plyr-control-spacing: 12px;
+  --plyr-control-radius: 0.5rem;
+  background: #000;
+}
+
+/* Video element */
+.plyr-container .plyr {
+  border-radius: 1.5rem;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+.plyr-container .plyr__video-wrapper {
+  background: #000;
+  height: 100%;
+}
+
+.plyr-container video {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
+/* Controls bar */
+.plyr-container .plyr__controls {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  padding: 1rem 1.25rem;
+  border-radius: 0 0 1.5rem 1.5rem;
+}
+
+/* Control buttons */
+.plyr-container .plyr__control {
+  color: #fff;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.plyr-container .plyr__control:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.plyr-container .plyr__control--pressed {
+  color: var(--primary);
+}
+
+/* Big play button */
+.plyr-container .plyr__control--overlaid {
+  background: var(--gradient-brand);
+  border: none;
+  border-radius: 50%;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.plyr-container .plyr__control--overlaid:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.plyr-container .plyr__control--overlaid svg {
+  fill: #fff;
+  width: 24px;
+  height: 24px;
+}
+
+/* Progress bar */
+.plyr-container .plyr__progress__container {
+  flex: 1;
+}
+
+.plyr-container .plyr__progress input[type="range"] {
+  color: var(--primary);
+}
+
+.plyr-container .plyr__progress__buffer {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Volume slider */
+.plyr-container .plyr__volume input[type="range"] {
+  color: var(--primary);
+}
+
+/* Time display */
+.plyr-container .plyr__time {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings menu */
+.plyr-container .plyr__menu__container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.plyr-container .plyr__menu__container .plyr__control {
+  color: var(--foreground);
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+}
+
+.plyr-container .plyr__menu__container .plyr__control:hover {
+  background: var(--muted);
+}
+
+.plyr-container .plyr__menu__container .plyr__control[aria-checked="true"]::before {
+  background: var(--primary);
+}
+
+.plyr-container .plyr__menu__container .plyr__menu__value {
+  color: var(--muted-foreground);
+}
+
+/* Quality badge */
+.plyr-container .plyr__badge {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+/* Tooltip */
+.plyr-container .plyr__tooltip {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.625rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Poster */
+.plyr-container .plyr__poster {
+  background-size: cover;
+  background-position: center;
+}
+
+/* Loading spinner */
+.plyr-container .plyr--loading .plyr__poster::after {
+  border-color: var(--primary);
+  border-top-color: transparent;
+}
+
+/* Fullscreen */
+.plyr-container .plyr--fullscreen-fallback {
+  border-radius: 0;
+}
+
+/* RTL adjustments */
+.plyr-container .plyr__menu__container {
+  direction: rtl;
+  text-align: right;
+}
+
+.plyr-container .plyr__menu__container .plyr__control[role="menuitemradio"]::before {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+.plyr-container .plyr__menu__container .plyr__control[role="menuitemradio"]::after {
+  right: auto;
+  left: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .plyr-container .plyr__controls {
+    padding: 0.75rem 1rem;
+  }
+  
+  .plyr-container .plyr__control--overlaid {
+    padding: 1rem;
+  }
+  
+  .plyr-container .plyr__control--overlaid svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Print — exam generator paper
+   The admin chrome already hides itself on print (AdminShell). These rules
+   make the printed paper clean:
+   - `@page { margin: 0 }` drops Chrome's default header/footer (the page URL
+     and date that used to show on the printed exam); internal padding on the
+     paper keeps the content off the sheet edges.
+   - force a white sheet + black text regardless of the active theme.
+   ─────────────────────────────────────────────────────────────────────────── */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  #exam-paper {
+    padding: 14mm 14mm 18mm !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Slim themed scrollbar — the WHOLE admin panel (the page itself and every
+   scroll area inside it, keyed off the [data-admin-root] marker) plus
+   anywhere `.nice-scroll` is used. A thin pill in the brand tint on a clear
+   track, with no arrows; it follows the palette and light/dark through the
+   tokens.
+   Chrome, Edge and Safari get the fully custom ::-webkit-scrollbar version
+   (8px pill, no arrow buttons, darker on hover). Firefox, which has no such
+   pseudo-elements, gets the standard thin + coloured scrollbar. The standard
+   properties are kept away from Chromium on purpose: once set, Chrome
+   ignores the custom rules and draws its own thin bar with arrow buttons.
+   Phones draw their own thin, auto-hiding overlay indicators, which pages
+   can't restyle.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --scroll-thumb: color-mix(in oklch, var(--primary) 32%, transparent);
+  --scroll-thumb-hover: color-mix(in oklch, var(--primary) 58%, transparent);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html:has([data-admin-root]),
+  [data-admin-root] *,
+  .nice-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
+
+html:has([data-admin-root])::-webkit-scrollbar-button,
+[data-admin-root] *::-webkit-scrollbar-button,
+.nice-scroll::-webkit-scrollbar-button {
+  display: none;
+}
+html:has([data-admin-root])::-webkit-scrollbar,
+[data-admin-root] *::-webkit-scrollbar,
+.nice-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html:has([data-admin-root])::-webkit-scrollbar-track,
+[data-admin-root] *::-webkit-scrollbar-track,
+.nice-scroll::-webkit-scrollbar-track,
+html:has([data-admin-root])::-webkit-scrollbar-corner,
+[data-admin-root] *::-webkit-scrollbar-corner,
+.nice-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+html:has([data-admin-root])::-webkit-scrollbar-thumb,
+[data-admin-root] *::-webkit-scrollbar-thumb,
+.nice-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scroll-thumb);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+html:has([data-admin-root])::-webkit-scrollbar-thumb:hover,
+[data-admin-root] *::-webkit-scrollbar-thumb:hover,
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOADING STATE — shared/ui/LoadingScreen
+   A wide, thin circle holding the logo, the label with bouncing dots, a hint
+   and a sliding bar. Transform/opacity animations only, so it runs on the
+   compositor and never janks the page underneath.
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* Over the whole page, on the same backdrop the site sits on. */
+.brand-loader--page {
+  background: var(--gradient-hero);
+}
+.brand-loader--delayed {
+  opacity: 0;
+  /* Waits a tenth of a second: an instant page change never flashes it. */
+  animation: brand-loader-in 0.15s ease 0.1s forwards;
+}
+/* A list reloading (search / filter): its rows stay, dimmed — after a tenth
+   of a second, so a quick reload doesn't blink. */
+.brand-loader--refreshing {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.2s ease 0.1s;
+}
+.brand-loader__ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: min(38rem, 88vw);
+  aspect-ratio: 1;
+  padding-inline: 12%;
+  border-radius: 9999px;
+  text-align: center;
+  border: 1px solid color-mix(in oklab, var(--primary) 16%, transparent);
+  /* Filled with a faint tint of the brand color, deepest at the center. */
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--primary) 9%, transparent),
+    color-mix(in oklab, var(--primary) 4%, transparent) 70%,
+    color-mix(in oklab, var(--primary) 2%, transparent)
+  );
+}
+.brand-loader__ring[data-size="sm"] {
+  width: min(16rem, 80vw);
+  gap: 0.35rem;
+  padding-inline: 10%;
+}
+.dark .brand-loader__ring {
+  border-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--primary) 16%, transparent),
+    color-mix(in oklab, var(--primary) 5%, transparent) 75%,
+    transparent
+  );
+}
+.brand-loader__logo {
+  animation: brand-loader-breathe 2.4s ease-in-out infinite;
+}
+.brand-loader__dots {
+  display: inline-flex;
+  gap: 0.22em;
+  margin-inline-start: 0.4em;
+  vertical-align: middle;
+}
+.brand-loader__dots > i {
+  width: 0.28em;
+  height: 0.28em;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.25;
+  animation: brand-loader-dot 1.2s ease-in-out infinite;
+}
+.brand-loader__dots > i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.brand-loader__dots > i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.brand-loader__bar {
+  position: relative;
+  width: min(62%, 20rem);
+  height: 4px;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+}
+.brand-loader__ring[data-size="sm"] .brand-loader__bar {
+  width: 62%;
+  height: 3px;
+  margin-top: 0.6rem;
+}
+.brand-loader__bar > span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 30%;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  animation: brand-loader-slide 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes brand-loader-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes brand-loader-breathe {
+  0%,
+  100% {
+    transform: scale(0.98);
+  }
+  50% {
+    transform: scale(1);
+  }
+}
+@keyframes brand-loader-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-0.15em);
+  }
+}
+/* Right to left, the way the page reads. */
+@keyframes brand-loader-slide {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-340%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader__logo,
+  .brand-loader__dots > i,
+  .brand-loader__bar > span {
+    animation: none;
+  }
+  .brand-loader__dots > i {
+    opacity: 0.6;
+  }
+  .brand-loader__bar > span {
+    width: 100%;
+    opacity: 0.55;
+  }
+}

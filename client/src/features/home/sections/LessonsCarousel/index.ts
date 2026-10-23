@@ -1,0 +1,1 @@
+export { LessonsCarousel } from "./LessonsCarousel";

@@ -1,0 +1,73 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies (matches any node_modules at any depth)
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+build
+.output
+.vinxi
+.tanstack/**
+.nitro
+*.local
+
+# Next.js
+.next
+.vercel
+next-env.d.ts.bak
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+client/.env
+client/.env.local
+client/.env.development.local
+client/.env.production.local
+server/.env
+server/.env.local
+server/.env.development.local
+server/.env.production.local
+# (.env.example files are tracked intentionally)
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+Thumbs.db
+
+# Runtime uploads (lesson thumbnails, etc.)
+server/uploads/
+!server/uploads/.gitkeep
+
+
+
+
+*.rar
+*.zip
