@@ -112,126 +112,125 @@ export function SiteFooter() {
   ].filter((s) => s.href);
 
   return (
-    <footer id="contact" className="mt-24 px-4 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-4xl border border-border bg-card shadow-soft">
-        {/* a quiet DNA hairline as the footer's signature edge */}
-        <DnaStrand orientation="horizontal" className="h-5 w-full opacity-70" />
+    // Edge to edge across the screen; the content inside keeps the page's width.
+    <footer id="contact" className="mt-24 border-t border-border bg-card">
+      {/* a quiet DNA hairline as the footer's signature edge */}
+      <DnaStrand orientation="horizontal" className="h-5 w-full opacity-70" />
 
-        <div className="grid gap-10 px-6 pb-10 pt-6 sm:px-10 lg:grid-cols-12 lg:gap-8">
-          <div className="lg:col-span-5">
-            <Link
-              href="/"
-              aria-label={SITE.brandShort}
-              className="inline-flex items-center"
-            >
-              <BrandLogo className="h-16" />
-            </Link>
-            <p className="mt-4 max-w-md text-sm leading-loose text-muted-foreground">
-              منصة تعليمية متخصصة في {SITE.subject} لطلبة الإعدادية والثانوية مع{" "}
-              {SITE.teacherName}، بأسلوب حديث بالرسم والتجربة يخليك تفهم مش تحفظ
-              وتتفوق بثقة.
-            </p>
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 pb-10 pt-6 sm:px-10 lg:grid-cols-12 lg:gap-8">
+        <div className="lg:col-span-5">
+          <Link
+            href="/"
+            aria-label={SITE.brandShort}
+            className="inline-flex items-center"
+          >
+            <BrandLogo className="h-16" />
+          </Link>
+          <p className="mt-4 max-w-md text-sm leading-loose text-muted-foreground">
+            منصة تعليمية متخصصة في {SITE.subject} لطلبة الإعدادية والثانوية مع{" "}
+            {SITE.teacherName}، بأسلوب حديث بالرسم والتجربة يخليك تفهم مش تحفظ
+            وتتفوق بثقة.
+          </p>
 
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              {socials.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  aria-label={s.label}
-                  target={s.href.startsWith("http") ? "_blank" : undefined}
-                  rel={
-                    s.href.startsWith("http")
-                      ? "noopener noreferrer"
-                      : undefined
-                  }
-                  className="flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            {socials.map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                aria-label={s.label}
+                target={s.href.startsWith("http") ? "_blank" : undefined}
+                rel={
+                  s.href.startsWith("http") ? "noopener noreferrer" : undefined
+                }
+                className="flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
+              >
+                <svg
+                  className="size-4"
+                  viewBox="0 0 24 24"
+                  fill={s.stroke ? "none" : "currentColor"}
+                  stroke={s.stroke ? "currentColor" : "none"}
+                  strokeWidth={s.stroke ? 2 : undefined}
                 >
-                  <svg
-                    className="size-4"
-                    viewBox="0 0 24 24"
-                    fill={s.stroke ? "none" : "currentColor"}
-                    stroke={s.stroke ? "currentColor" : "none"}
-                    strokeWidth={s.stroke ? 2 : undefined}
-                  >
-                    {s.icon}
-                  </svg>
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <nav className="lg:col-span-3" aria-label="روابط سريعة">
-            <h4 className="text-sm font-extrabold text-foreground">
-              روابط سريعة
-            </h4>
-            <ul className="mt-4 space-y-2.5">
-              {LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="group inline-flex items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    <MiniCell
-                      animated={false}
-                      className="size-4 text-primary/45 transition-colors group-hover:text-primary"
-                    />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <div className="lg:col-span-4">
-            <h4 className="text-sm font-extrabold text-foreground">
-              تواصل معانا
-            </h4>
-            <ul className="mt-3 space-y-1">
-              {contact.whatsappLink && (
-                <ContactRow
-                  href={contact.whatsappLink}
-                  icon={IconWhatsapp}
-                  label="واتساب"
-                  value={contact.whatsapp}
-                  external
-                  ltr
-                />
-              )}
-              {contact.telLink && (
-                <ContactRow
-                  href={contact.telLink}
-                  icon={IconPhone}
-                  label="هاتف"
-                  value={contact.phone}
-                  ltr
-                />
-              )}
-              {contact.email && (
-                <ContactRow
-                  href={`mailto:${contact.email}`}
-                  icon={IconMail}
-                  label="الإيميل"
-                  value={contact.email}
-                  ltr
-                  stroke
-                />
-              )}
-              {contact.facebook && (
-                <ContactRow
-                  href={contact.facebook}
-                  icon={IconFacebook}
-                  label="فيسبوك"
-                  value={`صفحة ${SITE.teacherShort}`}
-                  external
-                />
-              )}
-            </ul>
+                  {s.icon}
+                </svg>
+              </a>
+            ))}
           </div>
         </div>
 
-        <PaymentMethods />
+        <nav className="lg:col-span-3" aria-label="روابط سريعة">
+          <h4 className="text-sm font-extrabold text-foreground">
+            روابط سريعة
+          </h4>
+          <ul className="mt-4 space-y-2.5">
+            {LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="group inline-flex items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <MiniCell
+                    animated={false}
+                    className="size-4 text-primary/45 transition-colors group-hover:text-primary"
+                  />
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-        <div className="flex flex-col items-center justify-between gap-2 border-t border-border bg-muted/40 px-6 py-4 text-xs text-muted-foreground sm:flex-row sm:px-10">
+        <div className="lg:col-span-4">
+          <h4 className="text-sm font-extrabold text-foreground">
+            تواصل معانا
+          </h4>
+          <ul className="mt-3 space-y-1">
+            {contact.whatsappLink && (
+              <ContactRow
+                href={contact.whatsappLink}
+                icon={IconWhatsapp}
+                label="واتساب"
+                value={contact.whatsapp}
+                external
+                ltr
+              />
+            )}
+            {contact.telLink && (
+              <ContactRow
+                href={contact.telLink}
+                icon={IconPhone}
+                label="هاتف"
+                value={contact.phone}
+                ltr
+              />
+            )}
+            {contact.email && (
+              <ContactRow
+                href={`mailto:${contact.email}`}
+                icon={IconMail}
+                label="الإيميل"
+                value={contact.email}
+                ltr
+                stroke
+              />
+            )}
+            {contact.facebook && (
+              <ContactRow
+                href={contact.facebook}
+                icon={IconFacebook}
+                label="فيسبوك"
+                value={`صفحة ${SITE.teacherShort}`}
+                external
+              />
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <PaymentMethods />
+
+      <div className="border-t border-border bg-muted/40">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-4 text-xs text-muted-foreground sm:flex-row sm:px-10">
           <p>
             © {new Date().getFullYear()} {SITE.brandShort} — جميع الحقوق محفوظة.
           </p>

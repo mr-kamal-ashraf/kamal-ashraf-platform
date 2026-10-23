@@ -613,8 +613,10 @@ const PASSWORD_RESET_CODE_TTL_MS = 10 * 60 * 1000;
 const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_PASSWORD_RESET_ATTEMPTS = 5;
 
+/** "منصة أستاذ كمال أشرف" — or "منصتنا" when no name is set. */
 function platformName(): string {
-  return env.PLATFORM_NAME?.trim() || "منصتنا";
+  const name = env.PLATFORM_NAME?.trim();
+  return name ? `منصة ${name}` : "منصتنا";
 }
 
 function buildPasswordResetMessage(code: string): string {
@@ -628,7 +630,7 @@ function buildPasswordResetMessage(code: string): string {
 function buildPasswordChangedMessage(): string {
   return [
     `تم تغيير كلمة السر لحسابك على ${platformName()} ✅`,
-    "لو مش إنت اللي غيّرتها، كلّم المستر فوراً.",
+    "لو مش إنت اللي غيّرتها، كلّم رقم الدعم فوراً.",
   ].join("\n");
 }
 

@@ -120,6 +120,61 @@ async function persistOutboundMessage(
   );
 }
 
+/** A recipient device couldn't decrypt one of our messages and asked for it again. */
+function recordRetry(messageId: string): void {
+  logger.warn("[whatsapp-bridge] a recipient's device couldn't decrypt a message — resending", {
+    messageId,
+  });
+  void WhatsappOutboundMessage.updateOne({ _id: messageId }, { $inc: { retries: 1 } }).catch(
+    () => undefined,
+  );
+}
+
+/** WhatsApp reported how far our messages got (sent / delivered / read). */
+function recordStatuses(updates: any[]): void {
+  for (const { key, update } of updates ?? []) {
+    const status = Number(update?.status);
+    if (!key?.fromMe || !key.id || !Number.isFinite(status)) continue;
+    void WhatsappOutboundMessage.updateOne({ _id: key.id }, { $max: { status } }).catch(
+      () => undefined,
+    );
+  }
+}
+
+// libsignal (the encryption layer under Baileys) prints its session
+// bookkeeping straight to the console — and those lines carry the raw session
+// keys ("Closing session: SessionEntry { … privKey … }"). They must never end
+// up in our logs, so they're dropped; real errors still get through.
+const SIGNAL_CONSOLE_NOISE = [
+  "Closing session:",
+  "Opening session:",
+  "Removing old closed session:",
+  "Migrating session to:",
+  "Closing open session in favor of incoming prekey bundle",
+  "Closing stale open session for new outgoing prekey bundle",
+  "Session already closed",
+  "Session already open",
+  "Decrypted message with closed session.",
+];
+let signalConsoleMuted = false;
+
+function muteSignalConsoleNoise(): void {
+  if (signalConsoleMuted) return;
+  signalConsoleMuted = true;
+  /* eslint-disable no-console -- this wraps the console itself */
+  for (const level of ["log", "info", "warn"] as const) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      const first = args[0];
+      if (typeof first === "string" && SIGNAL_CONSOLE_NOISE.some((p) => first.startsWith(p))) {
+        return;
+      }
+      original(...args);
+    };
+  }
+  /* eslint-enable no-console */
+}
+
 async function getOutboundMessage(
   baileys: any,
   messageId: string | null | undefined,
@@ -424,10 +479,12 @@ async function handleIncoming(payload: any): Promise<void> {
       }
       if (!text) continue;
       // WhatsApp may address the sender by a LID (`<id>@lid`) instead of a real
-      // phone number (common for Business accounts). `senderPn` carries the true
-      // phone in that case; otherwise fall back to the jid's own number.
-      const senderPn = String(msg.key?.senderPn ?? "");
-      const from = (senderPn || jid).split("@")[0].split(":")[0];
+      // phone number. The key then carries the other form in `remoteJidAlt`
+      // (Baileys 7; `senderPn` before it) — use whichever is the phone number,
+      // and the jid's own number when neither is.
+      const alt = String(msg.key?.remoteJidAlt ?? msg.key?.senderPn ?? "");
+      const phoneJid = [jid, alt].find((j) => j.endsWith("@s.whatsapp.net")) ?? jid;
+      const from = phoneJid.split("@")[0].split(":")[0];
       // Remember the EXACT jid we received on so the reply goes back there.
       rememberReplyJid(from, jid);
       logger.info("[whatsapp-bridge] inbound message", {
@@ -486,11 +543,16 @@ async function connect(): Promise<void> {
       markOnlineOnConnect: false, // keep the teacher's phone notifications intact
       syncFullHistory: false,
       generateHighQualityLinkPreview: false,
+      // Retries are answered from getMessage below (memory + Mongo, so they
+      // survive a restart) — not from Baileys' own in-memory copy, which would
+      // also hide them from the delivery trail (recordRetry).
+      enableRecentMessageCache: false,
       // A recipient can explicitly request a retry when its device cannot
       // decrypt one of our messages. Returning the original IMessage lets
       // Baileys create a fresh Signal session and relay that exact message.
       // The former `async () => undefined` made every such retry impossible.
       getMessage: async (key: any) => {
+        if (key?.id) recordRetry(key.id);
         const message = await getOutboundMessage(baileys, key?.id);
         if (!message && key?.id) {
           logger.warn("[whatsapp-bridge] retry requested for an unavailable message", {
@@ -571,6 +633,10 @@ async function connect(): Promise<void> {
     sock.ev.on("messages.upsert", (payload: any) => {
       void handleIncoming(payload);
     });
+
+    sock.ev.on("messages.update", (updates: any[]) => {
+      recordStatuses(updates);
+    });
   } catch (err) {
     state.status = "error";
     state.lastError = err instanceof Error ? err.message : String(err);
@@ -620,6 +686,7 @@ export async function initWhatsappBridge(): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
     });
   }
+  muteSignalConsoleNoise();
   stopped = false;
   state.status = "init";
   await connect();

@@ -7,7 +7,7 @@ import { SITE } from "@/shared/i18n/site";
 import { cn } from "@/shared/lib/cn";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useSiteSettings } from "@/shared/site-settings";
-import { BioBadge, BioIcon } from "@/shared/components/bio";
+import { BioBadge, BioIcon, SectionBackdrop } from "@/shared/components/bio";
 import {
   AllInOneHub,
   DetailedLesson,
@@ -35,7 +35,8 @@ export function WhyUs() {
   const { whyUs } = useSiteSettings();
 
   return (
-    <section id="why" className="relative scroll-mt-28 overflow-x-clip py-24 md:py-32">
+    <section id="why" className="relative isolate scroll-mt-28 overflow-x-clip py-24 md:py-32">
+      <SectionBackdrop variant="tissue" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 24 }}

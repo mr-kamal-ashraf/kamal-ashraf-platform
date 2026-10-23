@@ -13,3 +13,4 @@ export { CoverArt } from "./CoverArt";
 export { BioBadge } from "./BioBadge";
 export { MiniCell } from "./MiniCell";
 export { DnaStrand } from "./DnaStrand";
+export { SectionBackdrop } from "./SectionBackdrop";

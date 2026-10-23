@@ -14,7 +14,7 @@ import {
 import { SITE } from "@/shared/i18n/site";
 import { cn } from "@/shared/lib/cn";
 import { toArabicDigits } from "@/shared/lib/arabic";
-import { BioBadge } from "@/shared/components/bio";
+import { BioBadge, SectionBackdrop } from "@/shared/components/bio";
 import { IconWhatsapp } from "@/shared/components/SiteFooter/socialIcons";
 import { useSiteSettings } from "@/shared/site-settings";
 import { BtnNucleus } from "@/shared/ui/Button";
@@ -29,42 +29,20 @@ type Side = "right" | "left";
 
 /**
  * How the section moves: `reduce` — the device asks for no motion (everything
- * just in place); `once` — small screens, where what has entered stays put.
+ * just in place).
  */
 interface MotionMode {
   reduce: boolean;
-  once: boolean;
-}
-
-/** Phones and small tablets — below Tailwind's `md`, where the timeline runs down the side. */
-const SMALL_SCREEN = "(max-width: 767px)";
-
-/** True on small screens; read after mount so the first render matches the server's HTML. */
-function useSmallScreen() {
-  const [small, setSmall] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(SMALL_SCREEN);
-    const update = () => setSmall(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return small;
 }
 
 /**
- * A scroll progress that can be latched: with `latch` on it only ever moves
- * forward, so scrolling back up doesn't undo an entrance.
+ * A latched scroll progress: it only ever moves forward, so scrolling back up
+ * doesn't undo an entrance — what has come in stays put.
  */
-function useLatched(progress: MotionValue<number>, latch: boolean) {
+function useLatched(progress: MotionValue<number>) {
   const driver = useMotionValue(progress.get());
-  const latchRef = useRef(latch);
-  useEffect(() => {
-    latchRef.current = latch;
-    if (!latch) driver.set(progress.get());
-  }, [latch, driver, progress]);
   useMotionValueEvent(progress, "change", (v) => {
-    driver.set(latchRef.current ? Math.max(driver.get(), v) : v);
+    driver.set(Math.max(driver.get(), v));
   });
   return driver;
 }
@@ -72,9 +50,9 @@ function useLatched(progress: MotionValue<number>, latch: boolean) {
 /**
  * A card's entrance, tied to scrolling: it slides in from its own side,
  * straightens and settles, and its node on the timeline fills once it lands.
- * On larger screens it reverses when scrolling back up; on small screens it
- * plays the first time only and stays. With reduced motion it's simply in
- * place (constant values are swapped in, so nothing is left half-way).
+ * It plays the first time only and stays — scrolling back up and down again
+ * doesn't replay it. With reduced motion it's simply in place (constant
+ * values are swapped in, so nothing is left half-way).
  */
 function useEntrance(ref: RefObject<HTMLElement | null>, from: Side | "below", mode: MotionMode) {
   const { reduce } = mode;
@@ -82,7 +60,7 @@ function useEntrance(ref: RefObject<HTMLElement | null>, from: Side | "below", m
     target: ref,
     offset: ["start 96%", "start 60%"],
   });
-  const progress = useLatched(useSpring(scrollYProgress, SPRING), mode.once);
+  const progress = useLatched(useSpring(scrollYProgress, SPRING));
   const sign = from === "right" ? 1 : -1;
   const opacity = useTransform(progress, [0, 0.6], [0, 1]);
   const x = useTransform(progress, [0, 1], from === "below" ? [0, 0] : [sign * 96, 0]);
@@ -289,9 +267,9 @@ function AskRow({ whatsappLink, mode }: { whatsappLink: string; mode: MotionMode
  * "Everything you need to know before you start": a centred header, then the
  * questions as stops on a timeline that fills as the student scrolls through
  * them — down the middle on wider screens with the questions alternating
- * sides (each gliding in from its own side), down the right on phones, where
- * the entrance plays once and stays — ending at the WhatsApp stop. Panels open with a CSS grid-rows transition
- * (no height measuring in JS).
+ * sides (each gliding in from its own side), down the right on phones — ending
+ * at the WhatsApp stop. On every screen the entrance plays once and stays.
+ * Panels open with a CSS grid-rows transition (no height measuring in JS).
  */
 export function Faq() {
   const baseId = useId();
@@ -302,20 +280,21 @@ export function Faq() {
   const prefersReduced = useReducedMotion();
   const [reduce, setReduce] = useState(false);
   useEffect(() => setReduce(prefersReduced ?? false), [prefersReduced]);
-  const mode: MotionMode = { reduce, once: useSmallScreen() };
+  const mode: MotionMode = { reduce };
 
   const listRef = useRef<HTMLOListElement>(null);
   const { scrollYProgress } = useScroll({
     target: listRef,
     offset: ["start 75%", "end 65%"],
   });
-  const line = useLatched(useSpring(scrollYProgress, SPRING), mode.once);
+  const line = useLatched(useSpring(scrollYProgress, SPRING));
   const full = useMotionValue(1);
 
   if (faq.items.length === 0) return null;
 
   return (
-    <section id="faq" className="relative scroll-mt-28 overflow-x-clip py-24 md:py-28">
+    <section id="faq" className="relative isolate scroll-mt-28 overflow-x-clip py-24 md:py-28">
+      <SectionBackdrop variant="lab" />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 24 }}

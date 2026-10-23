@@ -57,12 +57,20 @@ export interface IWhatsappOutboundMessage {
   _id: string;
   data: unknown;
   expiresAt: Date;
+  /** Times a recipient device asked for it again because it couldn't decrypt it. */
+  retries?: number;
+  /** Furthest WhatsApp status reached (2 sent · 3 delivered · 4 read · 5 played). */
+  status?: number;
 }
 
 const whatsappOutboundMessageSchema = new Schema<IWhatsappOutboundMessage>(
   {
     _id: { type: String, required: true },
     data: { type: Schema.Types.Mixed, required: true },
+    // Delivery trail — tells a message that reached the phone apart from one
+    // stuck on "Waiting for this message" (retries keep climbing, no delivery).
+    retries: { type: Number, default: 0 },
+    status: { type: Number, default: 0 },
     // A TTL index with expireAfterSeconds: 0 expires each row at this exact
     // timestamp. MongoDB's TTL monitor is asynchronous, which is fine: rows
     // may remain briefly past expiry but will never be deleted too early.
