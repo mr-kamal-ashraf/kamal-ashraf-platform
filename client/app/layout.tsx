@@ -12,6 +12,7 @@ import {
 } from "@/config/fonts";
 import { FONT_FACE_CSS, FONT_PRELOADS } from "@/config/fonts.generated";
 import { SITE_URL } from "@/config/env";
+import { applyThemeMode } from "@/shared/lib/themeMode";
 import {
   OG_IMAGE,
   SEO_DESCRIPTION,
@@ -89,12 +90,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Applies the light/dark mode before first paint (no flash). Visitors keep
- * their own choice when the teacher allows the toggle; otherwise everyone gets
- * the teacher's default ("system" follows the device setting).
+ * Applies the light/dark mode before first paint (no flash) — the site's or,
+ * on an admin page, the panel's own (see applyThemeMode).
  */
 function themeInitScript(defaultMode: ThemeMode, allowToggle: boolean) {
-  return `(function(){try{var allow=${allowToggle ? "true" : "false"};var def=${JSON.stringify(defaultMode)};var saved=allow?localStorage.getItem('theme'):null;var t=(saved==='light'||saved==='dark')?saved:(def==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):def);if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`;
+  return `(${applyThemeMode.toString()})(${JSON.stringify(defaultMode)},${allowToggle ? "true" : "false"});`;
 }
 
 export default async function RootLayout({

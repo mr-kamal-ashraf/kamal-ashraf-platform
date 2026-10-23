@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/shared/lib/cn";
+import { themeStorageKey } from "@/shared/lib/themeMode";
 
 type Theme = "light" | "dark";
 
@@ -12,7 +13,8 @@ function readTheme(): Theme {
 
 function applyTheme(next: Theme) {
   try {
-    window.localStorage.setItem("theme", next);
+    // The admin panel's choice is kept apart from the site's.
+    window.localStorage.setItem(themeStorageKey(window.location.pathname), next);
   } catch {
     // ignore
   }

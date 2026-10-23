@@ -1,12 +1,14 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import { FloatingAIChat } from "@/features/ai-chat/FloatingAIChat";
 import { AnnouncementBar } from "@/shared/components/AnnouncementBar";
+import { applyThemeMode, themeStorageKey } from "@/shared/lib/themeMode";
 import { NavigationLoader } from "@/shared/navigation/NavigationLoader";
+import { useSiteSettings } from "@/shared/site-settings";
 
 /**
  * Popups + floating widgets that should render across the whole student site
@@ -33,9 +35,26 @@ function StudentAnnouncement() {
   return <AnnouncementBar />;
 }
 
+/**
+ * Moving between the site and the admin panel without a reload: each side
+ * takes its own light/dark mode (they are kept apart), before the page paints.
+ */
+function ThemeSideSync() {
+  const side = themeStorageKey(usePathname() ?? "");
+  const { theme } = useSiteSettings();
+  const shown = useRef(side);
+  useLayoutEffect(() => {
+    if (shown.current === side) return;
+    shown.current = side;
+    applyThemeMode(theme.defaultMode, theme.allowModeToggle);
+  }, [side, theme.defaultMode, theme.allowModeToggle]);
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
+      <ThemeSideSync />
       <StudentAnnouncement />
       {children}
       <StudentOnlyOverlays />
