@@ -63,7 +63,8 @@ export function PlayerProvider({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const userId = user?._id ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -121,8 +122,13 @@ export function PlayerProvider({
         if (cancelled) return;
         setLesson(lessonResult.lesson);
         // A save sent moments ago (leaving this lesson and coming straight
-        // back) may not have reached the server yet — resume from it anyway.
-        const sentHere = progressApi.sentOnExit(lessonResult.lesson._id);
+        // back) may not have reached the server yet, and a phone may have
+        // closed the browser before it could send one — resume from the
+        // furthest of those anyway.
+        const sentHere = Math.max(
+          progressApi.sentOnExit(lessonResult.lesson._id),
+          userId ? progressApi.localFurthest(userId, lessonResult.lesson._id) : 0,
+        );
         const stored = lessonResult.progress;
         setProgress(
           sentHere > (stored?.lastWatchedSecond ?? 0)
@@ -157,7 +163,7 @@ export function PlayerProvider({
     return () => {
       cancelled = true;
     };
-  }, [slug, isAuthenticated, authLoading, handleApiError]);
+  }, [slug, isAuthenticated, authLoading, handleApiError, userId]);
 
   const retryVideo = useCallback(async () => {
     if (retrying) return;
@@ -183,10 +189,11 @@ export function PlayerProvider({
   }, [slug, retrying]);
 
   // Watch progress reaches the server ONLY when the student leaves the video:
-  // another page, the tab hidden (switching tabs/apps, locking the phone), a
-  // refresh, or the browser closed. While it plays, the furthest point is just
-  // kept here in memory — no requests at all — so a full lesson costs one
-  // request per exit, however long it is.
+  // another page, a refresh, or the tab / browser closed — one request then,
+  // with the last second reached. Switching to another tab on a computer is
+  // not leaving. While it plays nothing is sent: the furthest point is kept in
+  // memory, plus a local copy in this browser (no network) in case it gets
+  // closed in a way no event reports.
   useEffect(() => {
     if (loading || !lesson || !videoUrl) return;
 
@@ -195,10 +202,15 @@ export function PlayerProvider({
     let saved = Math.max(progress?.lastWatchedSecond ?? 0, progressApi.sentOnExit(lessonId));
     let furthest = 0;
     let duration = 0;
+    let keptLocally = 0;
     let video: HTMLVideoElement | null = null;
     let cancelled = false;
     let rafId = 0;
     let attachAttempts = 0;
+    // Phones and tablets close a backgrounded browser to free memory, often
+    // with no event reaching the page. There, going to the background is the
+    // last sure moment, so it counts as leaving.
+    const touchDevice = window.matchMedia("(pointer: coarse)").matches;
 
     // Read from the element while it plays: when the player is torn down the
     // element is reset to a blank clip, so reading it on exit would say 0.
@@ -209,16 +221,23 @@ export function PlayerProvider({
       if (Number.isFinite(video.duration)) {
         duration = Math.max(duration, Math.floor(video.duration));
       }
+      // Every 5 more seconds watched — a tiny write in this browser only.
+      if (userId && furthest > saved && furthest - keptLocally >= 5) {
+        keptLocally = furthest;
+        progressApi.keepLocally(userId, lessonId, furthest, duration || undefined);
+      }
     };
 
     const save = () => {
-      if (furthest <= saved) return; // nothing new since the last save
-      saved = furthest;
-      progressApi.saveOnExit(lessonId, furthest, duration || undefined);
+      if (furthest > saved) {
+        saved = furthest;
+        progressApi.saveOnExit(lessonId, furthest, duration || undefined);
+      }
+      progressApi.forgetLocal(lessonId); // sent (or nothing new to send)
     };
 
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") save();
+      if (touchDevice && document.visibilityState === "hidden") save();
     };
 
     const tryAttach = () => {
@@ -237,8 +256,8 @@ export function PlayerProvider({
 
     rafId = requestAnimationFrame(tryAttach);
 
-    // visibilitychange covers switching tabs or apps and locking the phone;
-    // pagehide covers a refresh and closing the tab or browser.
+    // pagehide covers a refresh and closing the tab or browser; on phones,
+    // visibilitychange covers the browser going to the background.
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", save);
 
@@ -251,7 +270,7 @@ export function PlayerProvider({
       save(); // leaving within the site (another page, another lesson)
       video = null;
     };
-  }, [lesson, loading, videoUrl, progress]);
+  }, [lesson, loading, videoUrl, progress, userId]);
 
   const closeBlocker = useCallback(() => {
     setBlocker((b) => ({ ...b, open: false }));

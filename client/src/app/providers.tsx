@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
-import { AuthProvider } from "@/features/auth/AuthContext";
+import { progressApi } from "@/api";
+import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
 import { FloatingAIChat } from "@/features/ai-chat/FloatingAIChat";
 import { AnnouncementBar } from "@/shared/components/AnnouncementBar";
 import { applyThemeMode, themeStorageKey } from "@/shared/lib/themeMode";
@@ -51,10 +52,24 @@ function ThemeSideSync() {
   return null;
 }
 
+/**
+ * Lesson progress a phone never got to send (it closed the browser in the
+ * background) goes out once, the next time the student opens the site.
+ * Nothing is sent when there's nothing left over.
+ */
+function SendLeftoverProgress() {
+  const userId = useAuth().user?._id;
+  useEffect(() => {
+    if (userId) void progressApi.sendLeftovers(userId);
+  }, [userId]);
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <ThemeSideSync />
+      <SendLeftoverProgress />
       <StudentAnnouncement />
       {children}
       <StudentOnlyOverlays />
