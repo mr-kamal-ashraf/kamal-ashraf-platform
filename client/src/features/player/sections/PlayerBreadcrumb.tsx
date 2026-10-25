@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { riseIn } from "@/shared/lib/riseIn";
 import { usePlayer } from "../PlayerProvider";
 
 export function PlayerBreadcrumb() {
@@ -9,10 +9,9 @@ export function PlayerBreadcrumb() {
   if (!lesson) return null;
 
   return (
-    <motion.nav
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="mb-5 flex items-center gap-2 text-sm text-muted-foreground"
+    <nav
+      style={riseIn({ y: 0, duration: 0.4 })}
+      className="rise-in mb-5 flex items-center gap-2 text-sm text-muted-foreground"
     >
       <Link href="/" className="hover:text-primary">
         الرئيسية
@@ -23,6 +22,6 @@ export function PlayerBreadcrumb() {
       </Link>
       <span>/</span>
       <span className="font-semibold text-foreground">المشاهدة</span>
-    </motion.nav>
+    </nav>
   );
 }

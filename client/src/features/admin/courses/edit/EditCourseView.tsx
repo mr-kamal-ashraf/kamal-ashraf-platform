@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import { Field } from "@/features/admin/lessons/components/Field";
 import { FormSection } from "@/features/admin/lessons/components/FormSection";
 import { PublishStatus } from "@/features/admin/lessons/components/PublishStatus";
 import { useConfirm } from "@/features/admin/shared/confirm/ConfirmProvider";
+import { isOptimizable } from "@/shared/lib/images";
 import { STAGE_LIST } from "@/shared/lib/stage";
 import { CourseCodesSection } from "./CourseCodesSection";
 
@@ -303,12 +305,15 @@ export function EditCourseView({ courseId }: { courseId: string }) {
 
         <FormSection title="صورة الكورس">
           <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-start">
-            <div className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
               {thumbUrl ? (
-                <img
+                <Image
                   src={thumbUrl}
                   alt="صورة الكورس"
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="(min-width: 640px) 180px, 100vw"
+                  unoptimized={!isOptimizable(thumbUrl)}
+                  className="object-cover"
                 />
               ) : (
                 <span className="text-xs text-muted-foreground">لا توجد صورة</span>

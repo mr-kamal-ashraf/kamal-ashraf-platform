@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { isOptimizable } from "@/shared/lib/images";
 import { resolveAssetUrl } from "@/config/env";
 import { useEditLesson } from "../EditLessonProvider";
 
@@ -40,18 +42,24 @@ export function EditLessonThumbnail() {
         صورة الدرس المصغّرة
       </h2>
       <div className="grid gap-4 sm:grid-cols-[200px_1fr] sm:items-start">
-        <div className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-border bg-background">
+        <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-border bg-background">
           {localPreview ? (
-            <img
+            <Image
               src={localPreview}
               alt="معاينة جديدة"
-              className="h-full w-full object-cover"
+              fill
+              sizes="(min-width: 640px) 200px, 100vw"
+              unoptimized
+              className="object-cover"
             />
           ) : remoteUrl ? (
-            <img
+            <Image
               src={remoteUrl}
               alt={lesson.title}
-              className="h-full w-full object-cover"
+              fill
+              sizes="(min-width: 640px) 200px, 100vw"
+              unoptimized={!isOptimizable(remoteUrl)}
+              className="object-cover"
             />
           ) : (
             <span className="px-2 text-center text-xs text-muted-foreground">

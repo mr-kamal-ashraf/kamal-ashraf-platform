@@ -11,11 +11,16 @@ interface FloatingSpecimenProps {
   /** Seconds per drift cycle. */
   duration?: number;
   strokeWidth?: number;
+  /** Don't drift — for specimens behind content further down the page, where
+   *  a moving layer under the content makes the browser split everything on
+   *  top of it into extra layers (slow on weak devices). */
+  still?: boolean;
 }
 
 /**
  * A faint specimen (DNA, cell, leaf, crystal…) drifting slowly as if
- * suspended in fluid. Pure CSS animation — safe in server components.
+ * suspended in fluid (or resting, when `still`). Pure CSS animation — safe in
+ * server components.
  */
 export function FloatingSpecimen({
   name,
@@ -23,15 +28,16 @@ export function FloatingSpecimen({
   delay = 0,
   duration = 16,
   strokeWidth,
+  still = false,
 }: FloatingSpecimenProps) {
-  const style: CSSProperties = {
-    animationDelay: `${-delay}s`,
-    animationDuration: `${duration}s`,
-  };
+  const style: CSSProperties | undefined = still
+    ? undefined
+    : { animationDelay: `${-delay}s`, animationDuration: `${duration}s` };
   return (
     <span
       className={cn(
-        "pointer-events-none absolute select-none animate-drift",
+        "pointer-events-none absolute select-none",
+        !still && "animate-drift",
         className,
       )}
       style={style}

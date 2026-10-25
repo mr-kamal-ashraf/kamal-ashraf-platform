@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { animate, useInView } from "framer-motion";
+import { useEffect, useRef, type ReactNode } from "react";
 import { toArabicDigits } from "@/shared/lib/arabic";
+import { useRevealOnce } from "@/shared/hooks/useRevealOnce";
 
 interface StatCounterProps {
   value: number;
@@ -15,11 +15,16 @@ interface StatCounterProps {
   affixClassName?: string;
 }
 
+const digits = (n: number) =>
+  toArabicDigits(n.toLocaleString("en-US").replace(/,/g, "٬"));
+
 /**
  * Counts up from 0 to `value` (in Arabic-Indic digits) the first time it
  * scrolls into view. The final number is laid out invisibly to reserve the
  * width, and the moving digits sit on top of it — so nothing around the
- * counter jiggles while it runs. Screen readers get the final value only.
+ * counter jiggles while it runs. The digits are written straight into the
+ * page each frame (no React re-render per frame). Screen readers get the
+ * final value only.
  */
 export function StatCounter({
   value,
@@ -30,28 +35,33 @@ export function StatCounter({
   affixClassName,
 }: StatCounterProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
-  const [display, setDisplay] = useState(0);
-  const started = useRef(false);
+  const counting = useRef<HTMLSpanElement>(null);
+  const inView = useRevealOnce(ref, "-40px");
 
   useEffect(() => {
-    if (!inView || started.current) return;
-    started.current = true;
-    const controls = animate(0, value, {
-      duration,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate: (v) => setDisplay(Math.round(v)),
-    });
-    return () => controls.stop();
+    const el = counting.current;
+    if (!inView || !el) return;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      el.textContent = digits(value);
+      return;
+    }
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / (duration * 1000));
+      const eased = 1 - Math.pow(1 - t, 4);
+      el.textContent = digits(Math.round(value * eased));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [inView, value, duration]);
 
-  const digits = (n: number) =>
-    toArabicDigits(n.toLocaleString("en-US").replace(/,/g, "٬"));
-
-  const render = (n: number) => (
+  const render = (count: ReactNode) => (
     <>
       {prefix && <span className={affixClassName}>{prefix}</span>}
-      {digits(n)}
+      {count}
       {suffix && <span className={affixClassName}>{suffix}</span>}
     </>
   );
@@ -59,8 +69,10 @@ export function StatCounter({
   return (
     <span ref={ref} className={className}>
       <span aria-hidden className="relative inline-block">
-        <span className="invisible">{render(value)}</span>
-        <span className="absolute inset-0 text-center">{render(display)}</span>
+        <span className="invisible">{render(digits(value))}</span>
+        <span className="absolute inset-0 text-center">
+          {render(<span ref={counting}>{digits(0)}</span>)}
+        </span>
       </span>
       <span className="sr-only">{`${prefix}${digits(value)}${suffix}`}</span>
     </span>

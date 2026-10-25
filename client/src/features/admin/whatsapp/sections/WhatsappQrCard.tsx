@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useWhatsapp } from "../WhatsappProvider";
 
 /**
@@ -21,11 +22,13 @@ export function WhatsappQrCard() {
         <h2 className="text-sm font-bold text-foreground">اربط الرقم دلوقتي</h2>
         <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           <div className="w-full max-w-[260px] rounded-2xl border border-border bg-white p-3">
-            <img
+            {/* the code is generated on the spot (a data: URL), nothing to resize */}
+            <Image
               src={qr}
               alt="امسح كود واتساب"
               width={260}
               height={260}
+              unoptimized
               className="h-auto w-full"
             />
           </div>

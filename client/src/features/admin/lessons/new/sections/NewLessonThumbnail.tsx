@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useRef } from "react";
+import Image from "next/image";
 import { FormSection } from "../../components/FormSection";
 import { useNewLesson } from "../NewLessonProvider";
+import { isOptimizable } from "@/shared/lib/images";
 
 export function NewLessonThumbnail() {
   const { thumbnailFile, setThumbnailFile } = useNewLesson();
@@ -21,12 +23,15 @@ export function NewLessonThumbnail() {
         الصورة بتترفع بعد حفظ الدرس.
       </p>
       <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-start">
-        <div className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
+        <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
           {previewUrl ? (
-            <img
+            <Image
               src={previewUrl}
               alt="معاينة الصورة"
-              className="h-full w-full object-cover"
+              fill
+              sizes="(min-width: 640px) 180px, 100vw"
+              unoptimized={!isOptimizable(previewUrl)}
+              className="object-cover"
             />
           ) : (
             <span className="text-xs text-muted-foreground">لا توجد صورة</span>

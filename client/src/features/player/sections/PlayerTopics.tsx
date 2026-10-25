@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { riseIn } from "@/shared/lib/riseIn";
 import { usePlayer } from "../PlayerProvider";
 
 export function PlayerTopics() {
@@ -8,12 +8,7 @@ export function PlayerTopics() {
   if (!lesson || lesson.topics.length === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.6 }}
-      className="mt-10"
-    >
+    <div style={riseIn({ delay: 0.3, duration: 0.6 })} className="rise-in mt-10">
       <h2 className="text-xl font-extrabold">محاور الدرس</h2>
       <div className="mt-4 space-y-2">
         {lesson.topics.map((topic, i) => (
@@ -30,6 +25,6 @@ export function PlayerTopics() {
           </div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }

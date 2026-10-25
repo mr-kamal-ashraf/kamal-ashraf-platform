@@ -1,10 +1,7 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/shared/lib/cn";
 
 interface DnaHelixProps {
-  /** Number of base pairs drawn top → bottom. */
+  /** Number of base pairs visible top → bottom. */
   rungs?: number;
   /** Seconds for one full turn of the helix. */
   duration?: number;
@@ -13,16 +10,25 @@ interface DnaHelixProps {
   className?: string;
 }
 
+const GAP = 18;
+const REACH = 28;
+
 /**
- * A slowly rotating DNA double helix, animated in CSS.
+ * Two decimals. Math.cos/sin can differ in the last digit between the server
+ * (Node) and the browser, and React then reports the drawing as not matching
+ * the server's HTML.
+ */
+const round = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * A slowly turning DNA double helix that fills its box's width.
  *
- * Each base pair is a bar + two nucleotides. The nucleotides orbit on the
- * `dna-dot` keyframes (sideways + depth scale/fade), the bar stretches with
- * `dna-bar`; staggering the phase per rung produces the twist. Colors come
- * from the theme (brand + highlight), so it follows the palette.
- *
- * Animating SVG children repaints the SVG every frame, so the helix pauses
- * itself whenever it is scrolled out of view.
+ * A helix turning on its axis looks exactly like the same helix sliding along
+ * it, so the strand is drawn once (one extra turn long) and slides up by one
+ * turn on a loop. Moving a whole element is done by the GPU without
+ * repainting — animating each nucleotide repainted the drawing every frame,
+ * which is what made weak devices stutter. Colors come from the theme (brand +
+ * highlight), so it follows the palette.
  */
 export function DnaHelix({
   rungs = 14,
@@ -30,74 +36,89 @@ export function DnaHelix({
   rungsPerTurn = 10,
   className,
 }: DnaHelixProps) {
-  const ref = useRef<SVGSVGElement>(null);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      ([entry]) => setPaused(!entry.isIntersecting),
-      { rootMargin: "80px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  const gap = 18;
-  const height = rungs * gap;
+  const drawn = rungs + rungsPerTurn;
 
   return (
-    <svg
-      ref={ref}
-      viewBox={`0 0 80 ${height}`}
-      className={cn("overflow-visible", paused && "dna-paused", className)}
+    <div
       aria-hidden
+      className={cn("flex items-center justify-center", className)}
     >
-      {Array.from({ length: rungs }).map((_, i) => {
-        const y = gap / 2 + i * gap;
-        const phase = -((i % rungsPerTurn) / rungsPerTurn) * duration;
-        const timing = {
-          animationDuration: `${duration}s`,
-          animationDelay: `${phase}s`,
-        };
-        const opposite = {
-          animationDuration: `${duration}s`,
-          animationDelay: `${phase - duration / 2}s`,
-        };
-        return (
-          <g key={i}>
-            <line
-              x1="12"
-              x2="68"
-              y1={y}
-              y2={y}
-              className="dna-bar"
-              style={timing}
-              stroke="currentColor"
-              strokeOpacity={0.28}
-              strokeWidth={2}
-              strokeLinecap="round"
-            />
-            <circle
-              cx="40"
-              cy={y}
-              r="4.6"
-              className="dna-dot"
-              style={timing}
-              fill="var(--brand)"
-            />
-            <circle
-              cx="40"
-              cy={y}
-              r="4.6"
-              className="dna-dot"
-              style={opposite}
-              fill="var(--highlight)"
-            />
-          </g>
-        );
-      })}
-    </svg>
+      <div
+        className="dna-window relative w-full max-h-full overflow-hidden"
+        style={{ aspectRatio: `80 / ${rungs * GAP}` }}
+      >
+        {/* one turn tall, so sliding it by its own height moves one turn */}
+        <div
+          className="dna-slide absolute inset-x-0 top-0"
+          style={{
+            height: `${(rungsPerTurn / rungs) * 100}%`,
+            animationDuration: `${duration}s`,
+          }}
+        >
+          <svg
+            viewBox={`0 0 80 ${drawn * GAP}`}
+            preserveAspectRatio="none"
+            className="absolute inset-x-0 top-0 w-full overflow-visible"
+            style={{ height: `${(drawn / rungsPerTurn) * 100}%` }}
+          >
+            {Array.from({ length: drawn }).map((_, i) => {
+              const y = GAP / 2 + i * GAP;
+              const angle = (2 * Math.PI * (i % rungsPerTurn)) / rungsPerTurn;
+              const x = round(-REACH * Math.cos(angle));
+              const depth = round(Math.sin(angle));
+              return (
+                <g key={i}>
+                  <line
+                    x1={40 + x}
+                    x2={40 - x}
+                    y1={y}
+                    y2={y}
+                    stroke="currentColor"
+                    strokeOpacity={0.28}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  />
+                  <Nucleotide
+                    x={40 + x}
+                    y={y}
+                    depth={depth}
+                    fill="var(--brand)"
+                  />
+                  <Nucleotide
+                    x={40 - x}
+                    y={y}
+                    depth={-depth}
+                    fill="var(--highlight)"
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** depth 1 = nearest the viewer (bigger, solid), −1 = behind (small, faint). */
+function Nucleotide({
+  x,
+  y,
+  depth,
+  fill,
+}: {
+  x: number;
+  y: number;
+  depth: number;
+  fill: string;
+}) {
+  return (
+    <circle
+      cx={x}
+      cy={y}
+      r={round(4.6 * (0.9 + 0.25 * depth))}
+      fill={fill}
+      opacity={round(0.725 + 0.275 * depth)}
+    />
   );
 }

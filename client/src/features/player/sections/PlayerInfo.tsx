@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { riseIn } from "@/shared/lib/riseIn";
 import { StageBadge } from "@/shared/ui/StageBadge";
 import { usePlayer } from "../PlayerProvider";
 
@@ -10,11 +10,9 @@ export function PlayerInfo() {
   if (!lesson) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.15, duration: 0.6 }}
-      className="mt-6 flex flex-wrap items-start justify-between gap-4"
+    <div
+      style={riseIn({ delay: 0.15, duration: 0.6 })}
+      className="rise-in mt-6 flex flex-wrap items-start justify-between gap-4"
     >
       <div>
         <div className="flex flex-wrap items-center gap-2">
@@ -37,6 +35,6 @@ export function PlayerInfo() {
       >
         تفاصيل الدرس
       </Link>
-    </motion.div>
+    </div>
   );
 }

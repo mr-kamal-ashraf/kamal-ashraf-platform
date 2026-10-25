@@ -7,7 +7,7 @@ import {
   BioDivider,
   CellPattern,
   FloatingSpecimen,
-  MicroscopeLens,
+  EarthScene,
 } from "@/shared/components/bio";
 
 interface AuthBrandPanelProps {
@@ -53,7 +53,7 @@ export function AuthBrandPanel({ title, subtitle }: AuthBrandPanelProps) {
           transition={{ duration: 0.7 }}
           className="flex w-full justify-center"
         >
-          <MicroscopeLens className="max-w-[min(22rem,48vh)]" />
+          <EarthScene className="max-w-[min(22rem,48vh)]" />
         </motion.div>
 
         <motion.div

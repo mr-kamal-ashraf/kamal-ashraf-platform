@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { coursesApi, paymentsApi, isApiError } from "@/api";
@@ -16,6 +17,7 @@ import { BtnNucleus } from "@/shared/ui/Button";
 import { getLessonGradient } from "@/shared/lib/stage";
 import { cn } from "@/shared/lib/cn";
 import { resolveAssetUrl } from "@/config/env";
+import { isOptimizable } from "@/shared/lib/images";
 import {
   CardPaymentForm,
   type CardCheckout,
@@ -401,8 +403,14 @@ function OrderSummary({ data }: { data: CourseDetailResponse }) {
             }}
           >
             {thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={thumb} alt="" className="h-full w-full object-cover" />
+              <Image
+                src={thumb}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 380px, 144px"
+                unoptimized={!isOptimizable(thumb)}
+                className="object-cover"
+              />
             ) : (
               <CoverArt
                 seed={course.slug}

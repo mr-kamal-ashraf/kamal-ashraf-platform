@@ -26,12 +26,20 @@ export default async function HomePage() {
     <div className="relative min-h-screen">
       <JsonLd data={homeGraph(settings)} />
       <SiteHeader />
+      {/* Sections below the first screen are drawn only as they come near
+          it (`defer-render`), so the first screen shows sooner. */}
       <main>
         <Hero />
         <Marquee />
-        <WhyUs />
-        <LessonsCarousel />
-        <Faq />
+        <div className="defer-render">
+          <WhyUs />
+        </div>
+        <div className="defer-render">
+          <LessonsCarousel />
+        </div>
+        <div className="defer-render">
+          <Faq />
+        </div>
       </main>
       <SiteFooter />
     </div>

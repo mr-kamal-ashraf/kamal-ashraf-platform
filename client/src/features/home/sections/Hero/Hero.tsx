@@ -1,10 +1,10 @@
 "use client";
 
 import { Fragment, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { SITE } from "@/shared/i18n/site";
+import { riseIn } from "@/shared/lib/riseIn";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   RichText,
@@ -21,8 +21,6 @@ import {
   FloatingSpecimen,
 } from "@/shared/components/bio";
 import { HeroStats } from "./HeroStats";
-
-const EASE = [0.4, 0, 0.2, 1] as const;
 
 /** Headline text with الكلمة الملونة in the brand gradient (see headline.ts). */
 function HeadlineParts({ parts }: { parts: HeadlinePart[] }) {
@@ -49,24 +47,23 @@ function HelixUnderline({ children }: { children: ReactNode }) {
         fill="none"
         aria-hidden
       >
-        <motion.path
+        <path
           d="M2 8 C 40 -2, 70 18, 110 8 S 180 -2, 220 8 S 280 18, 298 8"
+          pathLength={1}
+          className="draw-in"
           stroke="var(--highlight)"
           strokeWidth="3"
           strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ delay: 1, duration: 1.4, ease: "easeInOut" }}
         />
-        <motion.path
+        <path
           d="M2 8 C 40 18, 70 -2, 110 8 S 180 18, 220 8 S 280 -2, 298 8"
+          pathLength={1}
+          className="draw-in"
+          style={{ animationDelay: "1.25s" }}
           stroke="var(--primary)"
           strokeOpacity="0.55"
           strokeWidth="2"
           strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ delay: 1.25, duration: 1.4, ease: "easeInOut" }}
         />
       </svg>
     </span>
@@ -136,50 +133,41 @@ export function Hero() {
           portrait grows on laptops instead of giving way to the column gap. */}
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-12 sm:px-6 md:pb-28 md:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:px-8 xl:gap-16">
         {/* ── Copy ── (a size container: the headline scales with its width) */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: EASE }}
-          className="@container relative z-10 text-center lg:text-start"
+        <div
+          style={riseIn({ y: 30 })}
+          className="rise-in @container relative z-10 text-center lg:text-start"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
+          <div
+            style={riseIn({ y: 0, scale: 0.9, delay: 0.1, duration: 0.5 })}
+            className="rise-in"
           >
             <BioBadge>{hero.badge}</BioBadge>
-          </motion.div>
+          </div>
 
           {/* sm+: the size is capped by the column width (8.5cqi ≈ the default
               first line's width ÷ 11.7), so that line fits on one line; a
               longer one the teacher writes wraps instead of running into the
               portrait. */}
-          <motion.h1
-            className="mt-6 text-[calc(2rem*var(--font-scale,1))] font-extrabold leading-[max(1.6,var(--font-leading,0))] tracking-tight sm:text-[calc(min(3rem,8.5cqi)*var(--font-scale,1))] xl:text-[calc(min(3.25rem,8.5cqi)*var(--font-scale,1))]"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.7 }}
+          <h1
+            style={riseIn({ delay: 0.2 })}
+            className="rise-in mt-6 text-[calc(2rem*var(--font-scale,1))] font-extrabold leading-[max(1.6,var(--font-leading,0))] tracking-tight sm:text-[calc(min(3rem,8.5cqi)*var(--font-scale,1))] xl:text-[calc(min(3.25rem,8.5cqi)*var(--font-scale,1))]"
           >
             <HeadlineParts parts={headline.line1} />
             <br className="hidden sm:block" />{" "}
             <HeadlineLine2 parts={headline.line2} />
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.7 }}
-            className="mx-auto mt-7 max-w-xl text-base leading-loose text-muted-foreground sm:text-lg lg:mx-0"
+          <p
+            style={riseIn({ delay: 0.4 })}
+            className="rise-in mx-auto mt-7 max-w-xl text-base leading-loose text-muted-foreground sm:text-lg lg:mx-0"
           >
             <RichText text={hero.description} />
-          </motion.p>
+          </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55, duration: 0.6 }}
+          <div
+            style={riseIn({ delay: 0.55, duration: 0.6 })}
             // Phones: both buttons stacked at full width. sm+: side by side.
-            className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:justify-start"
+            className="rise-in mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:justify-start"
           >
             {!isLoading && !isAuthenticated && (
               <Link
@@ -203,25 +191,19 @@ export function Hero() {
               </svg>
               {hero.secondaryCta}
             </a>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.6 }}
-          >
+          <div style={riseIn({ delay: 0.7, duration: 0.6 })} className="rise-in">
             <HeroStats className="mx-auto mt-10 max-w-lg lg:mx-0" />
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* ── Teacher portrait ── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
+        <div
+          style={riseIn({ y: 0, scale: 0.94, delay: 0.2, duration: 0.9 })}
           // Phones: the portrait runs edge to edge (cancels the 1rem page
           // padding) instead of sitting small inside it; the section clips.
-          className="relative -mx-4 w-[calc(100%+2rem)] sm:mx-auto sm:w-full sm:max-w-lg lg:max-w-none"
+          className="rise-in relative -mx-4 w-[calc(100%+2rem)] sm:mx-auto sm:w-full sm:max-w-lg lg:max-w-none"
         >
           <div
             className="absolute inset-0 -z-20"
@@ -235,8 +217,7 @@ export function Hero() {
               rotating square's corners can never widen the page on phones */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-full"
-            style={{ contain: "paint" }}
+            className="pointer-events-none absolute inset-0 -z-10 overflow-clip rounded-full"
           >
             <svg
               viewBox="0 0 100 100"
@@ -260,13 +241,14 @@ export function Hero() {
             <DnaHelix rungs={12} className="size-full" />
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 30, y: -10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-            className="absolute -right-2 top-12 z-20 hidden animate-float rounded-2xl border border-border bg-card px-4 py-3 shadow-elegant sm:block lg:-right-4"
+          {/* Fades in (outer), floats (inner). Two animations on one element
+              would make the browser run every animation on the page on the
+              main thread, every frame — so they're split. */}
+          <div
+            style={riseIn({ x: 30, y: -10, delay: 0.8, duration: 0.6 })}
+            className="rise-in absolute -right-2 top-12 z-20 hidden sm:block lg:-right-4"
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex animate-float items-center gap-2.5 rounded-2xl border border-border bg-card px-4 py-3 shadow-elegant">
               <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <BioIcon name="microscope" className="size-5" />
               </div>
@@ -279,13 +261,11 @@ export function Hero() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, x: -30, y: 10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 1, duration: 0.6 }}
-            className="absolute -left-2 bottom-24 z-20 hidden rounded-2xl border border-border bg-card px-4 py-3 shadow-elegant sm:block lg:left-2"
+          <div
+            style={riseIn({ x: -30, y: 10, delay: 1, duration: 0.6 })}
+            className="rise-in absolute -left-2 bottom-24 z-20 hidden rounded-2xl border border-border bg-card px-4 py-3 shadow-elegant sm:block lg:left-2"
           >
             <div className="flex items-center gap-2.5">
               <div className="flex size-10 items-center justify-center rounded-xl bg-highlight/12 text-highlight">
@@ -300,13 +280,11 @@ export function Hero() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.2, duration: 0.6 }}
-            className="absolute bottom-6 right-2 z-20 hidden rounded-2xl bg-primary px-3.5 py-2.5 shadow-brand md:block lg:-right-2 lg:bottom-14"
+          <div
+            style={riseIn({ y: 0, scale: 0.8, delay: 1.2, duration: 0.6 })}
+            className="rise-in absolute bottom-6 right-2 z-20 hidden rounded-2xl bg-primary px-3.5 py-2.5 shadow-brand md:block lg:-right-2 lg:bottom-14"
           >
             <div className="flex items-center gap-2 text-primary-foreground">
               <BioIcon name="spark" className="size-4 shrink-0" />
@@ -314,7 +292,7 @@ export function Hero() {
                 مساعد ذكي بيجاوبك ٢٤ ساعة
               </span>
             </div>
-          </motion.div>
+          </div>
 
           <Image
             src={assets.hero}
@@ -329,7 +307,7 @@ export function Hero() {
             // "1920w" candidate showed it at ~65% of the column.
             className="relative z-10 mx-auto h-auto w-full max-w-150"
           />
-        </motion.div>
+        </div>
       </div>
     </section>
   );

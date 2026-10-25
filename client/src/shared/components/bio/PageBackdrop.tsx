@@ -5,13 +5,15 @@ import { FloatingSpecimen } from "./FloatingSpecimen";
 /**
  * Shared biology backdrop for inner pages (courses, course details, profile,
  * player, payment): a soft top glow, a faint tissue pattern and a couple of
- * drifting specimens. Place inside a `relative` container.
+ * specimens. They stay still: the page's content sits on top of them, and a
+ * moving layer underneath would split it into extra layers. Place inside a
+ * `relative` container.
  */
 export function PageBackdrop({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 -z-10 h-[36rem] overflow-hidden",
+        "pointer-events-none absolute inset-x-0 top-0 -z-10 h-[36rem] overflow-clip",
         className,
       )}
       aria-hidden
@@ -27,12 +29,12 @@ export function PageBackdrop({ className }: { className?: string }) {
       <FloatingSpecimen
         name="leaf"
         className="right-[4%] top-16 hidden size-24 text-primary/9 sm:block"
-        delay={2}
+        still
       />
       <FloatingSpecimen
         name="crystal"
         className="left-[5%] top-40 hidden size-20 text-highlight/10 md:block"
-        delay={7}
+        still
       />
     </div>
   );

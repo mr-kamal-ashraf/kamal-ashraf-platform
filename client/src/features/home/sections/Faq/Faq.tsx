@@ -1,123 +1,102 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
-  motion,
-  useMotionValue,
-  useMotionValueEvent,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-  type MotionValue,
-} from "framer-motion";
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { SITE } from "@/shared/i18n/site";
 import { cn } from "@/shared/lib/cn";
 import { toArabicDigits } from "@/shared/lib/arabic";
 import { BioBadge, SectionBackdrop } from "@/shared/components/bio";
 import { IconWhatsapp } from "@/shared/components/SiteFooter/socialIcons";
 import { useSiteSettings } from "@/shared/site-settings";
+import { useRevealOnce } from "@/shared/hooks/useRevealOnce";
 import { BtnNucleus } from "@/shared/ui/Button";
-
-/** Softens the raw scroll position so cards glide instead of tracking the wheel 1:1. */
-const SPRING = { stiffness: 140, damping: 26, mass: 0.4 };
+import { Reveal } from "@/shared/ui/Reveal";
 
 /** The hexagon each timeline node is drawn as. */
 const HEX = "M22 2.5 39 12.25v19.5L22 41.5 5 31.75v-19.5Z";
 
-type Side = "right" | "left";
+/**
+ * A card enters when its top is this far above the bottom of the screen. Its
+ * glide, its node lighting up and the timeline filling all take the same 0.8s
+ * and end together: each animation ending separately cost weak phones another
+ * redraw of the page.
+ */
+const ENTER_AT = "0px 0px -8% 0px";
+
+type Side = "right" | "left" | "below";
 
 /**
- * How the section moves: `reduce` — the device asks for no motion (everything
- * just in place).
+ * Where a card starts its entrance (read by `.faq-card` in styles.css): from
+ * its own side, slightly tilted — or from below for the last stop.
  */
-interface MotionMode {
-  reduce: boolean;
-}
-
-/**
- * A latched scroll progress: it only ever moves forward, so scrolling back up
- * doesn't undo an entrance — what has come in stays put.
- */
-function useLatched(progress: MotionValue<number>) {
-  const driver = useMotionValue(progress.get());
-  useMotionValueEvent(progress, "change", (v) => {
-    driver.set(Math.max(driver.get(), v));
-  });
-  return driver;
-}
-
-/**
- * A card's entrance, tied to scrolling: it slides in from its own side,
- * straightens and settles, and its node on the timeline fills once it lands.
- * It plays the first time only and stays — scrolling back up and down again
- * doesn't replay it. With reduced motion it's simply in place (constant
- * values are swapped in, so nothing is left half-way).
- */
-function useEntrance(ref: RefObject<HTMLElement | null>, from: Side | "below", mode: MotionMode) {
-  const { reduce } = mode;
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 96%", "start 60%"],
-  });
-  const progress = useLatched(useSpring(scrollYProgress, SPRING));
-  const sign = from === "right" ? 1 : -1;
-  const opacity = useTransform(progress, [0, 0.6], [0, 1]);
-  const x = useTransform(progress, [0, 1], from === "below" ? [0, 0] : [sign * 96, 0]);
-  const y = useTransform(progress, [0, 1], from === "below" ? [48, 0] : [18, 0]);
-  const rotate = useTransform(progress, [0, 1], from === "below" ? [0, 0] : [sign * 2.5, 0]);
-  const scale = useTransform(progress, [0, 1], [0.94, 1]);
-  const lit = useTransform(progress, [0.7, 1], [0, 1]);
-  const one = useMotionValue(1);
-  const zero = useMotionValue(0);
+function startingPoint(side: Side) {
+  if (side === "below") {
+    return { "--faq-x": "0px", "--faq-y": "48px", "--faq-rotate": "0deg" } as CSSProperties;
+  }
+  const sign = side === "right" ? 1 : -1;
   return {
-    style: reduce
-      ? { opacity: one, x: zero, y: zero, rotate: zero, scale: one }
-      : { opacity, x, y, rotate, scale },
-    lit: reduce ? one : lit,
-  };
+    "--faq-x": `${sign * 96}px`,
+    "--faq-y": "18px",
+    "--faq-rotate": `${sign * 2.5}deg`,
+  } as CSSProperties;
 }
 
-/** A stop on the timeline: a hexagon that fills with the brand colour. */
-function Node({
-  lit,
-  className,
-  children,
-}: {
-  lit: MotionValue<number>;
-  className?: string;
-  children: ReactNode;
-}) {
-  const unlit = useTransform(lit, (v) => 1 - v);
+/**
+ * A stop on the timeline: a hexagon that fills with the brand colour as its
+ * card lands (eased in, ending with the card — see ENTER_AT).
+ */
+function Node({ lit, className, children }: { lit: boolean; className?: string; children: ReactNode }) {
+  const fade = "transition-opacity duration-800 ease-in";
   return (
     <span
       aria-hidden
-      className={cn("relative z-10 flex size-11 shrink-0 items-center justify-center", className)}
+      data-lit={lit || undefined}
+      className={cn("group relative z-10 flex size-11 shrink-0 items-center justify-center", className)}
     >
       <svg viewBox="0 0 44 44" className="absolute inset-0 size-full">
         <path d={HEX} className="fill-card stroke-border" strokeWidth="1.5" strokeLinejoin="round" />
-        <motion.path
+        <path
           d={HEX}
-          className="fill-primary stroke-primary"
+          className={cn("fill-primary stroke-primary opacity-0 group-data-lit:opacity-100", fade)}
           strokeWidth="1.5"
           strokeLinejoin="round"
-          style={{ opacity: lit }}
         />
       </svg>
-      <motion.span
-        className="absolute text-sm font-black tabular-nums text-muted-foreground"
-        style={{ opacity: unlit }}
+      <span
+        className={cn(
+          "absolute text-sm font-black tabular-nums text-muted-foreground group-data-lit:opacity-0",
+          fade,
+        )}
       >
         {children}
-      </motion.span>
-      <motion.span
-        className="absolute text-sm font-black tabular-nums text-primary-foreground"
-        style={{ opacity: lit }}
+      </span>
+      <span
+        className={cn(
+          "absolute text-sm font-black tabular-nums text-primary-foreground opacity-0 group-data-lit:opacity-100",
+          fade,
+        )}
       >
         {children}
-      </motion.span>
+      </span>
     </span>
   );
+}
+
+/** A timeline stop that enters the first time it scrolls into view. */
+function useStop(index: number, onShown: (index: number) => void) {
+  const ref = useRef<HTMLLIElement>(null);
+  const shown = useRevealOnce(ref, ENTER_AT);
+  useEffect(() => {
+    if (shown) onShown(index);
+  }, [shown, index, onShown]);
+  return { ref, shown };
 }
 
 function FaqRow({
@@ -126,21 +105,20 @@ function FaqRow({
   answer,
   open,
   onToggle,
+  onShown,
   baseId,
-  mode,
 }: {
   index: number;
   question: string;
   answer: string;
   open: boolean;
   onToggle: () => void;
+  onShown: (index: number) => void;
   baseId: string;
-  mode: MotionMode;
 }) {
-  const ref = useRef<HTMLLIElement>(null);
+  const { ref, shown } = useStop(index, onShown);
   // Alternating sides: 1st on the right, 2nd on the left, …
-  const side: Side = index % 2 === 0 ? "right" : "left";
-  const { style, lit } = useEntrance(ref, side, mode);
+  const side = index % 2 === 0 ? "right" : "left";
   const buttonId = `${baseId}-q-${index}`;
   const panelId = `${baseId}-a-${index}`;
 
@@ -150,28 +128,24 @@ function FaqRow({
       className="relative ps-16 md:grid md:grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] md:items-start md:ps-0"
     >
       <Node
-        lit={lit}
+        lit={shown}
         className="absolute start-0 top-3.5 md:relative md:col-start-2 md:row-start-1 md:mx-auto md:mt-4"
       >
         {toArabicDigits(index + 1)}
       </Node>
-      <motion.div
-        style={style}
+      <div
+        data-shown={shown || undefined}
+        style={startingPoint(side)}
         className={cn(
-          "relative overflow-hidden rounded-2xl border bg-card transition-[border-color,box-shadow] duration-300 md:row-start-1",
+          "faq-card relative overflow-hidden rounded-2xl border bg-card md:row-start-1",
           side === "right" ? "md:col-start-1" : "md:col-start-3",
           open ? "border-primary/30 shadow-soft" : "border-border hover:border-primary/25",
         )}
       >
         {/* a thin brand line along the top of the open card */}
-        <span
-          aria-hidden
-          className={cn(
-            "absolute inset-x-0 top-0 h-0.5 bg-gradient-brand transition-transform duration-500",
-            side === "right" ? "origin-left" : "origin-right",
-            open ? "scale-x-100" : "scale-x-0",
-          )}
-        />
+        {open && (
+          <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-gradient-brand" />
+        )}
         <h3>
           <button
             id={buttonId}
@@ -187,7 +161,7 @@ function FaqRow({
             <span
               aria-hidden
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full border transition-all duration-300",
+                "flex size-8 shrink-0 items-center justify-center rounded-full border",
                 open
                   ? "rotate-45 border-primary bg-primary text-primary-foreground"
                   : "border-border text-muted-foreground",
@@ -206,38 +180,41 @@ function FaqRow({
             </span>
           </button>
         </h3>
-        <div
-          id={panelId}
-          role="region"
-          aria-labelledby={buttonId}
-          className={cn(
-            "grid transition-[grid-template-rows] duration-300 ease-out",
-            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-          )}
-        >
-          <div className="overflow-hidden">
-            <p className="px-5 pb-5 text-sm leading-loose text-muted-foreground sm:px-6">
-              {answer}
-            </p>
-          </div>
+        {/* Opens at once and only the text fades in (`.faq-answer`). Sliding
+            the height or fading colours redrew the whole page on every frame,
+            and each extra animation (the icon turning, the top line growing)
+            cost weak phones more frames — so everything else switches
+            instantly. */}
+        <div id={panelId} role="region" aria-labelledby={buttonId} hidden={!open}>
+          <p className="faq-answer px-5 pb-5 text-sm leading-loose text-muted-foreground sm:px-6">
+            {answer}
+          </p>
         </div>
-      </motion.div>
+      </div>
     </li>
   );
 }
 
 /** The timeline's last stop: still have a question? → WhatsApp, centred under the line. */
-function AskRow({ whatsappLink, mode }: { whatsappLink: string; mode: MotionMode }) {
-  const ref = useRef<HTMLLIElement>(null);
-  const { style, lit } = useEntrance(ref, "below", mode);
+function AskRow({
+  index,
+  whatsappLink,
+  onShown,
+}: {
+  index: number;
+  whatsappLink: string;
+  onShown: (index: number) => void;
+}) {
+  const { ref, shown } = useStop(index, onShown);
   return (
     <li ref={ref} className="relative ps-16 pt-2 md:mt-8 md:flex md:flex-col md:items-center md:ps-0">
-      <Node lit={lit} className="absolute start-0 top-4 md:relative">
+      <Node lit={shown} className="absolute start-0 top-4 md:relative">
         ؟
       </Node>
-      <motion.div
-        style={style}
-        className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-5 sm:flex-row sm:items-center sm:p-6 md:mt-4 md:w-full md:max-w-xl"
+      <div
+        data-shown={shown || undefined}
+        style={startingPoint("below")}
+        className="faq-card relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-5 sm:flex-row sm:items-center sm:p-6 md:mt-4 md:w-full md:max-w-xl"
       >
         <div className="min-w-0 flex-1">
           <div className="text-base font-extrabold text-foreground">لسه عندك سؤال؟</div>
@@ -258,51 +235,35 @@ function AskRow({ whatsappLink, mode }: { whatsappLink: string; mode: MotionMode
           </BtnNucleus>
           كلمنا على واتساب
         </a>
-      </motion.div>
+      </div>
     </li>
   );
 }
 
 /**
  * "Everything you need to know before you start": a centred header, then the
- * questions as stops on a timeline that fills as the student scrolls through
- * them — down the middle on wider screens with the questions alternating
- * sides (each gliding in from its own side), down the right on phones — ending
- * at the WhatsApp stop. On every screen the entrance plays once and stays.
- * Panels open with a CSS grid-rows transition (no height measuring in JS).
+ * questions as stops on a timeline — down the middle on wider screens with the
+ * questions alternating sides (each gliding in from its own side), down the
+ * right on phones — ending at the WhatsApp stop. Each stop enters the first
+ * time it comes into view and stays; the timeline fills up to the furthest
+ * stop reached. All of it is CSS transitions started by an
+ * IntersectionObserver, so nothing runs while the page scrolls.
  */
 export function Faq() {
   const baseId = useId();
   const [open, setOpen] = useState<number | null>(0);
+  const [reached, setReached] = useState(-1);
   const { faq, contact } = useSiteSettings();
-  // Read after mount: the server can't know the setting, and the first client
-  // render must match the server's HTML (or hydration fails with it on).
-  const prefersReduced = useReducedMotion();
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => setReduce(prefersReduced ?? false), [prefersReduced]);
-  const mode: MotionMode = { reduce };
-
-  const listRef = useRef<HTMLOListElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: listRef,
-    offset: ["start 75%", "end 65%"],
-  });
-  const line = useLatched(useSpring(scrollYProgress, SPRING));
-  const full = useMotionValue(1);
+  const onShown = useCallback((index: number) => setReached((r) => Math.max(r, index)), []);
 
   if (faq.items.length === 0) return null;
+  const stops = faq.items.length + 1;
 
   return (
     <section id="faq" className="relative isolate scroll-mt-28 overflow-x-clip py-24 md:py-28">
       <SectionBackdrop variant="lab" />
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6 }}
-          className="mx-auto max-w-2xl text-center"
-        >
+        <Reveal margin="-80px" className="mx-auto max-w-2xl text-center">
           <BioBadge>الأسئلة الشائعة</BioBadge>
           <h2 className="mt-4 text-3xl font-extrabold leading-snug tracking-tight sm:text-4xl">
             كل اللي محتاج تعرفه <span className="text-primary">قبل ما تبدأ</span>
@@ -311,18 +272,18 @@ export function Faq() {
             جمعنالك أكتر الأسئلة اللي بتوصلنا من الطلبة وأولياء الأمور، عشان
             تبدأ رحلتك مع {SITE.teacherName} وإنت فاهم كل حاجة.
           </p>
-        </motion.div>
+        </Reveal>
 
-        <ol ref={listRef} className="relative mt-14 space-y-4 sm:space-y-5 md:space-y-3">
-          {/* the timeline: a faint track, and its fill that follows the scroll */}
+        <ol className="relative mt-14 space-y-4 sm:space-y-5 md:space-y-3">
+          {/* the timeline: a faint track, and its fill down to the furthest stop reached */}
           <span
             aria-hidden
             className="absolute start-5.25 top-6 bottom-16 w-0.5 rounded-full bg-border md:start-1/2 md:translate-x-1/2"
           />
-          <motion.span
+          <span
             aria-hidden
-            style={{ scaleY: reduce ? full : line }}
-            className="absolute start-5.25 top-6 bottom-16 w-0.5 origin-top rounded-full bg-linear-to-b from-primary to-highlight md:start-1/2 md:translate-x-1/2"
+            style={{ transform: `scaleY(${(reached + 1) / stops})` }}
+            className="absolute start-5.25 top-6 bottom-16 w-0.5 origin-top rounded-full bg-linear-to-b from-primary to-highlight transition-transform duration-800 ease-out md:start-1/2 md:translate-x-1/2"
           />
 
           {faq.items.map((item, i) => (
@@ -333,11 +294,11 @@ export function Faq() {
               answer={item.a}
               open={open === i}
               onToggle={() => setOpen(open === i ? null : i)}
+              onShown={onShown}
               baseId={baseId}
-              mode={mode}
             />
           ))}
-          <AskRow whatsappLink={contact.whatsappLink} mode={mode} />
+          <AskRow index={faq.items.length} whatsappLink={contact.whatsappLink} onShown={onShown} />
         </ol>
       </div>
     </section>

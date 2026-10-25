@@ -1,10 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { resolveAssetUrl } from "@/config/env";
 import { toArabicDigits } from "@/shared/lib/arabic";
+import { isOptimizable } from "@/shared/lib/images";
 import { getLessonGradient } from "@/shared/lib/stage";
+import { Reveal } from "@/shared/ui/Reveal";
 import { StageBadge } from "@/shared/ui/StageBadge";
 import type { CourseCard } from "@/api/types";
 import { CoverArt } from "@/shared/components/bio";
@@ -24,14 +26,13 @@ export function CourseCardBig({ course, index }: CourseCardBigProps) {
   const thumbnailSrc = resolveAssetUrl(course.thumbnail);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+    <Reveal
       // Inset the trigger vertically only: the next card peeking in from the
       // side of the carousel must reveal with the first (an all-sides inset
       // kept it invisible until it was swiped fully into view).
-      viewport={{ once: true, margin: "-50px 0px" }}
-      transition={{ duration: 0.5, delay: (index % 4) * 0.08 }}
+      margin="-50px 0px"
+      rise={30}
+      delay={(index % 4) * 0.08}
     >
       <Link
         href={`/courses/${course.slug}`}
@@ -44,11 +45,13 @@ export function CourseCardBig({ course, index }: CourseCardBigProps) {
           style={{ background }}
         >
           {thumbnailSrc ? (
-            <img
+            <Image
               src={thumbnailSrc}
               alt={course.title}
-              className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
-              loading="lazy"
+              fill
+              sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 90vw"
+              unoptimized={!isOptimizable(thumbnailSrc)}
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.06]"
             />
           ) : (
             <CoverArt seed={course.slug} />
@@ -152,6 +155,6 @@ export function CourseCardBig({ course, index }: CourseCardBigProps) {
           </div>
         </div>
       </Link>
-    </motion.div>
+    </Reveal>
   );
 }

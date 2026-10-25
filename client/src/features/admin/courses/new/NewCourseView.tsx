@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
   useLiveRecheck,
   type FieldErrors,
 } from "@/features/admin/shared/wizardValidation";
+import { isOptimizable } from "@/shared/lib/images";
 import { DEFAULT_STAGE, STAGE_LIST } from "@/shared/lib/stage";
 
 interface NewCourseForm {
@@ -343,12 +345,15 @@ export function NewCourseView() {
                     هيتحط تدرّج لوني افتراضي.
                   </p>
                   <div className="grid gap-4 sm:grid-cols-[180px_1fr] sm:items-start">
-                    <div className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
+                    <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-background">
                       {previewUrl ? (
-                        <img
+                        <Image
                           src={previewUrl}
                           alt="معاينة"
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="(min-width: 640px) 180px, 100vw"
+                          unoptimized={!isOptimizable(previewUrl)}
+                          className="object-cover"
                         />
                       ) : (
                         <span className="text-xs text-muted-foreground">

@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSiteSettings } from "@/shared/site-settings";
 import {
@@ -10,17 +9,12 @@ import {
   FloatingSpecimen,
 } from "@/shared/components/bio";
 import { BtnNucleus } from "@/shared/ui/Button";
+import { Reveal } from "@/shared/ui/Reveal";
 
 export function LessonsEmptyState() {
   const { contact } = useSiteSettings();
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.6 }}
-      className="mx-6 sm:mx-10 lg:mx-12"
-    >
+    <Reveal margin="-50px" rise={30} className="mx-6 sm:mx-10 lg:mx-12">
       <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl border-2 border-dashed border-primary/30 bg-card/60 p-8 text-center sm:p-12">
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
@@ -34,18 +28,18 @@ export function LessonsEmptyState() {
         <FloatingSpecimen
           name="leaf"
           className="-right-3 -top-3 size-36 text-primary/8"
+          still
         />
         <FloatingSpecimen
           name="crystal"
           className="-bottom-4 -left-4 size-36 text-highlight/8"
-          delay={5}
+          still
         />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+        <Reveal
+          margin="0px"
+          rise={12}
+          delay={0.2}
           className="relative mx-auto flex size-20 items-center justify-center rounded-3xl bg-gradient-brand shadow-brand"
         >
           <span className="absolute inset-0 -z-10 animate-pulse-soft rounded-3xl bg-primary/40 blur-xl" />
@@ -55,42 +49,28 @@ export function LessonsEmptyState() {
             className="size-10 text-primary-foreground"
             strokeWidth={1.8}
           />
-        </motion.div>
+        </Reveal>
 
-        <motion.h3
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="relative mt-6 text-2xl font-extrabold text-foreground sm:text-3xl"
-        >
+        <Reveal margin="0px" rise={10} delay={0.3} className="relative mt-6">
+          <h3 className="text-2xl font-extrabold text-foreground sm:text-3xl">
           لسه مفيش كورسات متاحة حالياً
-        </motion.h3>
+          </h3>
+        </Reveal>
 
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="relative mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base"
-        >
+        <Reveal margin="0px" rise={10} delay={0.4} className="relative mt-3">
+          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
           الكورسات في الطريق، وقريب جداً هتكون متاحة هنا إن شاء الله 🤍
-        </motion.p>
+          </p>
+        </Reveal>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-        >
+        <Reveal margin="0px" rise={0} delay={0.5}>
           <BioDivider icon="dna" className="relative mt-6" />
-        </motion.div>
+        </Reveal>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.6, duration: 0.5 }}
+        <Reveal
+          margin="0px"
+          rise={10}
+          delay={0.6}
           className="relative mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           <a
@@ -123,8 +103,8 @@ export function LessonsEmptyState() {
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
           </Link>
-        </motion.div>
+        </Reveal>
       </div>
-    </motion.div>
+    </Reveal>
   );
 }

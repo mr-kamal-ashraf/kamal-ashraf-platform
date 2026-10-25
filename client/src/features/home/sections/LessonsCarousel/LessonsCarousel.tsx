@@ -1,21 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
+import dynamic from "next/dynamic";
 import type { Swiper as SwiperType } from "swiper";
-import "swiper/css";
-import "swiper/css/navigation";
 
 import { coursesApi } from "@/api";
 import type { CourseCard } from "@/api/types";
-import { CourseCardBig } from "@/features/courses/components/CourseCardBig";
 import { useAuth } from "@/features/auth/AuthContext";
 import { BioBadge, CellPattern, FloatingSpecimen } from "@/shared/components/bio";
 import { SITE } from "@/shared/i18n/site";
 import { LessonsEmptyState } from "./LessonsEmptyState";
 import { LoadingScreen } from "@/shared/ui/LoadingScreen";
+import { Reveal } from "@/shared/ui/Reveal";
+
+const CoursesSlider = dynamic(
+  () => import("./CoursesSlider").then((m) => m.CoursesSlider),
+  {
+    ssr: false,
+    loading: () => (
+      <LoadingScreen className="rounded-none border-0 bg-transparent py-10" />
+    ),
+  },
+);
 
 export function LessonsCarousel() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -65,20 +71,18 @@ export function LessonsCarousel() {
       <FloatingSpecimen
         name="mitochondria"
         className="left-[3%] top-16 -z-10 hidden size-20 text-highlight/12 md:block"
-        delay={3}
+        still
       />
       <FloatingSpecimen
         name="neuron"
         className="bottom-10 right-[4%] -z-10 hidden size-20 text-primary/10 md:block"
-        delay={9}
+        still
       />
 
       <div className="w-full">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+        <Reveal
+          margin="0px"
+          rise={30}
           className="mb-12 flex flex-col items-start justify-between gap-6 px-6 sm:flex-row sm:items-end sm:px-10 lg:px-12"
         >
           <div className="max-w-2xl">
@@ -132,37 +136,18 @@ export function LessonsCarousel() {
               </button>
             </div>
           )}
-        </motion.div>
+        </Reveal>
 
         {isLoading ? (
           <LoadingScreen className="rounded-none border-0 bg-transparent py-10" />
         ) : hasCourses ? (
           <div className="relative w-full">
-            <Swiper
-              dir="rtl"
-              modules={[Navigation]}
+            <CoursesSlider
+              courses={courses}
               onSwiper={(s) => {
                 swiperRef.current = s;
               }}
-              spaceBetween={20}
-              slidesPerView={1.1}
-              breakpoints={{
-                480: { slidesPerView: 1.3, spaceBetween: 20 },
-                640: { slidesPerView: 1.7, spaceBetween: 22 },
-                768: { slidesPerView: 2.1, spaceBetween: 24 },
-                1024: { slidesPerView: 2.6, spaceBetween: 26 },
-                1280: { slidesPerView: 3, spaceBetween: 28 },
-                1536: { slidesPerView: 3.4, spaceBetween: 30 },
-                1920: { slidesPerView: 4, spaceBetween: 32 },
-              }}
-              className="px-6! sm:px-10! lg:px-12!"
-            >
-              {courses.map((course, idx) => (
-                <SwiperSlide key={course._id} className="h-auto">
-                  <CourseCardBig course={course} index={idx} />
-                </SwiperSlide>
-              ))}
-            </Swiper>
+            />
 
             {/* Edge fade from sm up; on phones it covered the next card's
                 visible edge entirely. */}

@@ -1,27 +1,35 @@
 "use client";
 
 import { Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { progressApi } from "@/api";
 import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
-import { FloatingAIChat } from "@/features/ai-chat/FloatingAIChat";
 import { AnnouncementBar } from "@/shared/components/AnnouncementBar";
 import { applyThemeMode, themeStorageKey } from "@/shared/lib/themeMode";
 import { NavigationLoader } from "@/shared/navigation/NavigationLoader";
 import { useSiteSettings } from "@/shared/site-settings";
 
+/** Downloaded only for students who can use it, after the page has shown. */
+const FloatingAIChat = dynamic(
+  () => import("@/features/ai-chat/FloatingAIChat").then((m) => m.FloatingAIChat),
+  { ssr: false },
+);
+
 /**
  * Popups + floating widgets that should render across the whole student site
  * but never inside the admin panel (which has its own layout + AI chat page).
  *
- * FloatingAIChat has its own internal gate (logged-in), so if it decides to
- * hide itself the button simply doesn't appear. This wrapper just prevents it
- * from rendering on admin routes where it would collide with the admin chat page.
+ * The AI chat is for students with a course; visitors and everyone else never
+ * download it. FloatingAIChat still has its own gate (pages it hides on). This
+ * wrapper also keeps it off admin routes, where it would collide with the
+ * admin chat page.
  */
 function StudentOnlyOverlays() {
   const pathname = usePathname() ?? "";
-  if (pathname.startsWith("/admin")) return null;
+  const canChat = useAuth().user?.hasOwnedCourse;
+  if (pathname.startsWith("/admin") || !canChat) return null;
   return (
     <>
       <FloatingAIChat />

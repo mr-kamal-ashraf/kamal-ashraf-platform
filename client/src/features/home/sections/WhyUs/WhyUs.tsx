@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { SITE } from "@/shared/i18n/site";
 import { cn } from "@/shared/lib/cn";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -15,6 +14,7 @@ import {
   SolveSteps,
 } from "./visuals";
 import { BtnNucleus } from "@/shared/ui/Button";
+import { Reveal } from "@/shared/ui/Reveal";
 
 /** Illustration + grid placement for each feature position. */
 const LAYOUT: Array<{ visual: ReactNode; className: string }> = [
@@ -38,13 +38,7 @@ export function WhyUs() {
     <section id="why" className="relative isolate scroll-mt-28 overflow-x-clip py-24 md:py-32">
       <SectionBackdrop variant="tissue" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6 }}
-          className="mx-auto max-w-2xl text-center"
-        >
+        <Reveal margin="-80px" className="mx-auto max-w-2xl text-center">
           <BioBadge tone="highlight">مميزات المنصة</BioBadge>
           <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
             ليه <span className="text-primary">تختارنا؟</span>
@@ -53,20 +47,19 @@ export function WhyUs() {
             مش مجرد دروس فيديو، ده نظام كامل اتصمم عشان تفهم {SITE.subject}{" "}
             وتحبها مع {SITE.teacherName}.
           </p>
-        </motion.div>
+        </Reveal>
 
         <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {whyUs.items.map((item, i) => {
             const layout = LAYOUT[i] ?? LAYOUT[LAYOUT.length - 1];
             return (
-              <motion.article
+              <Reveal
+                as="article"
                 key={item.title}
-                initial={{ opacity: 0, y: 28 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.55, delay: i * 0.08 }}
+                rise={28}
+                delay={i * 0.08}
                 className={cn(
-                  "group flex flex-col gap-5 rounded-3xl border border-border bg-card p-5 shadow-soft transition-colors duration-300 hover:border-primary/30 sm:p-6",
+                  "group flex flex-col gap-5 rounded-3xl border border-border bg-card p-5 shadow-soft hover:border-primary/30 sm:p-6",
                   layout.className,
                 )}
               >
@@ -84,17 +77,13 @@ export function WhyUs() {
                     {item.description}
                   </p>
                 </div>
-              </motion.article>
+              </Reveal>
             );
           })}
         </div>
 
         {/* the goal */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.6 }}
+        <Reveal
           className="mt-5 flex flex-col items-center gap-5 rounded-3xl border border-primary/20 bg-primary/6 px-6 py-7 text-center sm:px-10 lg:flex-row lg:gap-8 lg:text-start"
         >
           <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-brand">
@@ -110,7 +99,7 @@ export function WhyUs() {
             <BtnNucleus />
             {isAuthenticated ? "شوف الكورسات" : "ابدأ رحلتك دلوقتي"}
           </Link>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );

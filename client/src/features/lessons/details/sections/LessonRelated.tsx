@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { resolveAssetUrl } from "@/config/env";
+import { isOptimizable } from "@/shared/lib/images";
 import { getLessonGradient } from "@/shared/lib/stage";
 import { StageBadge } from "@/shared/ui/StageBadge";
 import { CoverArt } from "@/shared/components/bio";
@@ -31,10 +33,13 @@ export function LessonRelated() {
                 style={{ background: rGradient }}
               >
                 {rThumbnail ? (
-                  <img
+                  <Image
                     src={rThumbnail}
                     alt={r.title}
-                    className="absolute inset-0 size-full object-cover"
+                    fill
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    unoptimized={!isOptimizable(rThumbnail)}
+                    className="object-cover"
                   />
                 ) : (
                   <CoverArt seed={r.slug} glyphClassName="size-24" />

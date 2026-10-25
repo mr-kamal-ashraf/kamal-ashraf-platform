@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { useLessonDetails } from "../LessonDetailsProvider";
 import { BtnNucleus } from "@/shared/ui/Button";
+import { Reveal } from "@/shared/ui/Reveal";
 
 export function LessonTopicsAndAccess() {
   const { lesson } = useLessonDetails();
@@ -15,19 +15,20 @@ export function LessonTopicsAndAccess() {
         <h2 className="text-2xl font-extrabold sm:text-3xl">تفاصيل الدرس:</h2>
         <ul className="mt-6 grid gap-3 sm:grid-cols-2">
           {lesson.topics.map((topic, i) => (
-            <motion.li
+            <Reveal
+              as="li"
               key={`${i}-${topic}`}
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
+              shift={20}
+              rise={0}
+              margin="0px"
+              delay={i * 0.08}
               className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-soft transition-colors hover:border-primary/40"
             >
               <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-brand text-xs font-bold text-primary-foreground">
                 ✓
               </span>
               <span className="text-sm leading-relaxed">{topic}</span>
-            </motion.li>
+            </Reveal>
           ))}
         </ul>
       </div>

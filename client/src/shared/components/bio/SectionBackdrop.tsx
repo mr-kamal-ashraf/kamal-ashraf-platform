@@ -2,13 +2,13 @@ import type { CSSProperties } from "react";
 import { cn } from "@/shared/lib/cn";
 import { CellPattern } from "./CellPattern";
 import { FloatingSpecimen } from "./FloatingSpecimen";
-import { Spores } from "./Spores";
 
 /*
  * Biology backdrops for home sections, so they don't sit on a flat colour.
  * Everything is static SVG / CSS gradients in the theme's colours, faint
- * enough to keep the content readable; the only motion is a few specimens
- * drifting (CSS transforms, stopped by the reduced-motion rule).
+ * enough to keep the content readable. Nothing moves: an animated layer under
+ * a section's content makes the browser split all the content on top of it
+ * into extra layers, which is what made weak devices stutter.
  */
 
 /** Fades the decorations out toward the section's top and bottom edges. */
@@ -67,7 +67,9 @@ function Helix({ className }: { className?: string }) {
 function Molecule({ className }: { className?: string }) {
   const ring = Array.from({ length: 6 }, (_, i) => {
     const a = (Math.PI / 3) * i - Math.PI / 2;
-    return [100 + 34 * Math.cos(a), 100 + 34 * Math.sin(a)] as const;
+    // rounded: Math.cos/sin can differ in the last digit between server and
+    // browser, which React reports as the HTML not matching
+    return [+(100 + 34 * Math.cos(a)).toFixed(1), +(100 + 34 * Math.sin(a)).toFixed(1)] as const;
   });
   const chains = [
     [ring[0], [100, 30], [128, 14]],
@@ -112,7 +114,7 @@ function MicroscopeField({ className }: { className?: string }) {
   );
 }
 
-/** "Why us": plant tissue to the sides, a DNA helix down each edge, drifting specimens. */
+/** "Why us": plant tissue to the sides, a DNA helix down each edge, specimens in the margins. */
 function TissueLayer() {
   return (
     <>
@@ -128,10 +130,10 @@ function TissueLayer() {
       </div>
       <Helix className="-left-2 top-[6%] hidden h-[34rem] rotate-[14deg] text-primary/14 lg:block dark:text-primary/18" />
       <Helix className="-right-2 bottom-[4%] hidden h-[30rem] -rotate-[12deg] text-highlight/16 lg:block dark:text-highlight/20" />
-      <FloatingSpecimen name="leaf" className="left-[7%] top-[9%] size-16 text-primary/14 sm:size-20" delay={3} />
-      <FloatingSpecimen name="crystal" className="right-[8%] top-[5%] size-12 text-tertiary/16 sm:size-16" delay={8} />
-      <FloatingSpecimen name="mitochondria" className="right-[3%] top-[46%] hidden size-24 text-highlight/14 md:block" delay={5} />
-      <FloatingSpecimen name="neuron" className="bottom-[10%] left-[3%] hidden size-24 text-primary/12 md:block" delay={11} />
+      <FloatingSpecimen name="leaf" className="left-[7%] top-[9%] size-16 text-primary/14 sm:size-20" still />
+      <FloatingSpecimen name="crystal" className="right-[8%] top-[5%] size-12 text-tertiary/16 sm:size-16" still />
+      <FloatingSpecimen name="mitochondria" className="right-[3%] top-[46%] hidden size-24 text-highlight/14 md:block" still />
+      <FloatingSpecimen name="neuron" className="bottom-[10%] left-[3%] hidden size-24 text-primary/12 md:block" still />
     </>
   );
 }
@@ -160,11 +162,10 @@ function LabLayer() {
       <Helix className="-right-1 top-[34%] hidden h-[26rem] rotate-[8deg] text-primary/12 lg:block dark:text-primary/16" />
       <Molecule className="left-[3%] top-[26%] hidden size-48 -rotate-12 text-primary/13 md:block dark:text-primary/17" />
       <Molecule className="bottom-[20%] right-[3%] hidden size-40 rotate-[20deg] text-highlight/15 md:block dark:text-highlight/19" />
-      <FloatingSpecimen name="cell" className="right-[9%] top-[14%] size-14 text-primary/14 sm:size-20" delay={4} />
-      <FloatingSpecimen name="dna" className="left-[10%] top-[8%] hidden size-16 text-tertiary/16 sm:block" delay={9} />
-      <FloatingSpecimen name="neuron" className="left-[8%] top-[60%] hidden size-20 text-primary/12 md:block" delay={13} />
-      <FloatingSpecimen name="ammonite" className="bottom-[9%] left-[6%] size-14 text-highlight/14 sm:size-20" delay={6} />
-      <Spores count={6} className="opacity-60" />
+      <FloatingSpecimen name="cell" className="right-[9%] top-[14%] size-14 text-primary/14 sm:size-20" still />
+      <FloatingSpecimen name="dna" className="left-[10%] top-[8%] hidden size-16 text-tertiary/16 sm:block" still />
+      <FloatingSpecimen name="neuron" className="left-[8%] top-[60%] hidden size-20 text-primary/12 md:block" still />
+      <FloatingSpecimen name="ammonite" className="bottom-[9%] left-[6%] size-14 text-highlight/14 sm:size-20" still />
     </>
   );
 }
@@ -175,7 +176,7 @@ function LabLayer() {
  */
 export function SectionBackdrop({ variant }: { variant: "tissue" | "lab" }) {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" style={EDGE_FADE}>
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-clip" style={EDGE_FADE}>
       {variant === "tissue" ? <TissueLayer /> : <LabLayer />}
     </div>
   );

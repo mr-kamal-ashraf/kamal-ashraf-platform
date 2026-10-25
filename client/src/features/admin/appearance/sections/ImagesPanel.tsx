@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import { PALETTES, PALETTE_META, type Palette } from "@/config/theme";
+import { isOptimizable } from "@/shared/lib/images";
 import { cn } from "@/shared/lib/cn";
 import type { AssetSlot } from "@/shared/site-settings";
 import { useConfirm } from "@/features/admin/shared/confirm/ConfirmProvider";
@@ -66,7 +68,7 @@ function ImageCard({
       </div>
       <div
         className={cn(
-          "mt-3 flex items-center justify-center overflow-hidden rounded-lg border border-border",
+          "relative mt-3 flex items-center justify-center overflow-hidden rounded-lg border border-border",
           tall ? "aspect-square" : "h-28",
           // Fixed backdrops (not the admin theme) so a logo is judged on the
           // background it will actually sit on.
@@ -75,8 +77,14 @@ function ImageCard({
         style={dark ? undefined : CHECKER}
       >
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element -- admin preview of arbitrary uploads
-          <img src={src} alt={title} className={cn("max-h-full max-w-full object-contain", tall ? "p-2" : "p-3")} />
+          <Image
+            src={src}
+            alt={title}
+            fill
+            sizes="320px"
+            unoptimized={!isOptimizable(src)}
+            className={cn("object-contain", tall ? "p-2" : "p-3")}
+          />
         ) : (
           <span className="text-xs text-muted-foreground">مفيش صورة</span>
         )}

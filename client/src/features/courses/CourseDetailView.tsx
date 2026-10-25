@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import { SiteFooter } from "@/shared/components/SiteFooter";
 import { StageBadge } from "@/shared/ui/StageBadge";
 import { getLessonGradient } from "@/shared/lib/stage";
 import { resolveAssetUrl } from "@/config/env";
+import { isOptimizable } from "@/shared/lib/images";
 import { BioIcon, CoverArt, PageBackdrop } from "@/shared/components/bio";
 import { BtnNucleus } from "@/shared/ui/Button";
 import { RedeemCodeForm } from "./components/RedeemCodeForm";
@@ -216,10 +218,14 @@ export function CourseDetailView({
                   style={{ background: gradient }}
                 >
                   {thumb ? (
-                    <img
+                    <Image
                       src={thumb}
                       alt={data.course.title}
-                      className="h-full w-full object-cover"
+                      fill
+                      priority
+                      sizes="(min-width: 1280px) 800px, (min-width: 1024px) 66vw, 100vw"
+                      unoptimized={!isOptimizable(thumb)}
+                      className="object-cover"
                     />
                   ) : (
                     <CoverArt

@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  motion,
-  AnimatePresence,
-  useMotionValueEvent,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-} from "framer-motion";
 import { toast } from "sonner";
 import { SITE } from "@/shared/i18n/site";
 import { BrandLogo } from "../BrandLogo";
@@ -35,43 +33,17 @@ const MOBILE_LINKS: Array<{ href: string; label: string; icon: BioIconName }> =
  */
 const SHOW_AT = 24;
 const HIDE_AT = 8;
-const CAPSULE_EASE = [0.22, 1, 0.36, 1] as const;
 
-/**
+/*
  * The capsule appears like a dynamic island: a small pill in the middle of the
  * bar that stretches out to wrap the logo and buttons while it fades in, then
- * one soft sheen crosses the glass. Leaving the top reverses it (shrinks back
- * to the middle, then fades). Only the absolutely-positioned glass layer
- * animates — the bar's content never moves or resizes.
+ * one soft sheen crosses it. Leaving the top reverses it (shrinks back to the
+ * middle, then fades). Only the absolutely-positioned capsule animates — the
+ * bar's content never moves or resizes. Docking also lifts the WHOLE bar 6px
+ * toward the top edge, so it reads as one object settling into place. All of
+ * it is CSS (`.site-header*` in styles.css): the page's JavaScript only flips
+ * `data-docked` when the page leaves or reaches the top.
  */
-const CAPSULE_FULL = { left: "calc(0% - 0px)", right: "calc(0% - 0px)" };
-const CAPSULE_PILL = {
-  left: "calc(50% - 40px)",
-  right: "calc(50% - 40px)",
-};
-const CAPSULE_IN = {
-  default: { duration: 0.6, ease: CAPSULE_EASE },
-  opacity: { duration: 0.25, ease: "easeOut" },
-} as const;
-const CAPSULE_OUT = {
-  default: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-  opacity: { duration: 0.25, delay: 0.1, ease: "easeIn" },
-} as const;
-
-/**
- * Docking: on scroll the WHOLE bar (logo, buttons and capsule together) rises
- * DOCK_RISE px toward the top edge while its glass background fades in, so it
- * reads as one object settling into place rather than a layer sliding behind
- * still content. A slightly over-damped spring: eases in and out naturally
- * and settles in ~0.3s with no bounce.
- */
-const DOCK_RISE = 6;
-const DOCK_SPRING = {
-  type: "spring",
-  stiffness: 420,
-  damping: 42,
-  mass: 0.9,
-} as const;
 
 /** Same width and padding as every page section, so the nav lines up with them. */
 const CONTAINER = "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8";
@@ -79,7 +51,7 @@ const CONTAINER = "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8";
 /**
  * The content answers the capsule: the logo and each button give one soft
  * pulse at the moment the glass edge sweeps past them — centre first while it
- * grows (delay follows CAPSULE_IN's ease-out), edges first while it shrinks.
+ * grows (delays follow the capsule's ease-out), edges first while it shrinks.
  * Uses the standalone CSS `scale` property through the Web Animations API, so
  * it never fights the buttons' own hover transforms and leaves no inline style
  * behind.
@@ -135,73 +107,60 @@ export function SiteHeader() {
     }
   };
 
-  const { scrollY, scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, {
-    stiffness: 120,
-    damping: 25,
-    mass: 0.3,
-  });
-
-  // Reuses framer's scroll tracking. Returning the same boolean is a no-op,
-  // so React re-renders only at the moment the capsule shows or hides.
-  const reduceMotion = useReducedMotion();
+  // Returning the same boolean is a no-op, so React re-renders only at the
+  // moment the capsule shows or hides. The reading bar under the capsule
+  // follows the scroll in CSS (a scroll-driven animation); browsers without
+  // those get it set from here instead.
   const [scrolled, setScrolled] = useState(false);
-  useMotionValueEvent(scrollY, "change", (y) => {
-    setScrolled((prev) => (prev ? y > HIDE_AT : y > SHOW_AT));
-  });
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const progressRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setReduceMotion(matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const bar = progressRef.current;
+    const cssDriven = CSS.supports("animation-timeline: scroll()");
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled((prev) => (prev ? y > HIDE_AT : y > SHOW_AT));
+      if (cssDriven || !bar) return;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.transform = `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const barRef = useRef<HTMLDivElement>(null);
-  useDockWave(barRef, scrolled, !!reduceMotion);
+  useDockWave(barRef, scrolled, reduceMotion);
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
   return (
-    <motion.header
-      initial={{ y: -16, opacity: 0 }}
-      animate={{
-        y: scrolled && !reduceMotion ? -DOCK_RISE : 0,
-        opacity: 1,
-      }}
-      transition={{
-        y: DOCK_SPRING,
-        opacity: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
-      }}
-      className="sticky top-0 z-50 w-full pt-3 sm:pt-4"
+    <header
+      data-docked={scrolled || undefined}
+      className="site-header sticky top-0 z-50 w-full pt-3 sm:pt-4"
     >
-      <div className={CONTAINER}>
+      <div className={cn(CONTAINER, "site-header__bar")}>
         <div className="relative">
-          {/* The glass capsule. At the top of the page the nav floats bare over
-            the hero; when it docks the capsule grows out of the middle of the
-            bar (CAPSULE_*). It is absolutely positioned, so its animation
-            never reflows the bar's content. */}
-          <motion.div
+          {/* The capsule. At the top of the page the nav floats bare over the
+            hero; when it docks the capsule grows out of the middle of the bar.
+            It is absolutely positioned, so its animation never reflows the
+            bar's content. Nearly opaque instead of a frosted blur: blurring
+            what scrolls under a sticky bar is redone on every frame, which
+            weak phones can't keep up with. */}
+          <div
             aria-hidden
-            initial={false}
-            animate={
-              scrolled
-                ? { opacity: 1, ...CAPSULE_FULL }
-                : {
-                    opacity: 0,
-                    ...(reduceMotion ? CAPSULE_FULL : CAPSULE_PILL),
-                  }
-            }
-            transition={scrolled ? CAPSULE_IN : CAPSULE_OUT}
-            className="pointer-events-none absolute inset-y-0 overflow-hidden rounded-full border border-border/80 bg-card/90 shadow-soft backdrop-blur-md"
+            className="site-header__capsule pointer-events-none absolute inset-y-0 overflow-hidden rounded-full border border-border/80 bg-card/95 shadow-soft"
           >
             {scrolled && !reduceMotion && (
-              <motion.span
-                initial={{ x: "-100%" }}
-                animate={{ x: "100%" }}
-                transition={{ delay: 0.3, duration: 1.1, ease: "easeInOut" }}
-                className="absolute inset-0 bg-[linear-gradient(100deg,transparent_35%,rgb(255_255_255/0.5)_50%,transparent_65%)] opacity-60 dark:opacity-20"
-              />
+              <span className="site-header__sheen absolute inset-0 bg-[linear-gradient(100deg,transparent_35%,rgb(255_255_255/0.5)_50%,transparent_65%)] opacity-60 dark:opacity-20" />
             )}
-            <motion.div
-              style={{ scaleX }}
-              className="absolute bottom-0 left-0 h-0.5 w-full origin-left bg-primary/70"
+            <div
+              ref={progressRef}
+              className="site-header__progress absolute bottom-0 left-0 h-0.5 w-full origin-left bg-primary/70"
             />
-          </motion.div>
+          </div>
 
           <div
             ref={barRef}
@@ -353,16 +312,12 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className={cn(CONTAINER, "md:hidden")}
-          >
-            <div className="mt-2 rounded-3xl border border-border bg-card/95 p-3 shadow-elegant backdrop-blur-md">
+      {open && (
+        <div
+          style={{ "--rise-y": "-8px", "--rise-duration": "0.2s" } as CSSProperties}
+          className={cn(CONTAINER, "rise-in md:hidden")}
+        >
+          <div className="mt-2 rounded-3xl border border-border bg-card p-3 shadow-elegant">
               <nav className="flex flex-col gap-1">
                 {MOBILE_LINKS.map((link) => (
                   <Link
@@ -409,9 +364,8 @@ export function SiteHeader() {
                 )}
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.header>
+        </div>
+      )}
+    </header>
   );
 }

@@ -113,7 +113,7 @@ export function SiteFooter() {
 
   return (
     // Edge to edge across the screen; the content inside keeps the page's width.
-    <footer id="contact" className="mt-24 border-t border-border bg-card">
+    <footer id="contact" className="defer-render mt-24 border-t border-border bg-card">
       {/* a quiet DNA hairline as the footer's signature edge */}
       <DnaStrand orientation="horizontal" className="h-5 w-full opacity-70" />
 

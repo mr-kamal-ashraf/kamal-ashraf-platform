@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   LOGIN_REQUIRED_REASON_CONFIG,
   type LoginRequiredReason,
 } from "./login-required-config";
 import { PopupReasonIcon } from "./popup-icons";
+import { riseIn } from "@/shared/lib/riseIn";
 import { BtnNucleus } from "@/shared/ui/Button";
 
 interface Props {
@@ -25,22 +25,17 @@ export function LoginRequiredPopup({
   const config = LOGIN_REQUIRED_REASON_CONFIG[reason];
 
   return (
-    <AnimatePresence>
+    <>
       {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+        <div
+          style={riseIn({ y: 0, duration: 0.2 })}
+          className="rise-in fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
           onClick={onClose}
         >
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+          <div
+            style={riseIn({ y: 0, scale: 0.92, duration: 0.2 })}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-elegant"
+            className="rise-in relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-elegant"
           >
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
 
@@ -84,9 +79,9 @@ export function LoginRequiredPopup({
                 </p>
               )}
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

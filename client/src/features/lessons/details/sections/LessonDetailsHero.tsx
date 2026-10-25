@@ -1,12 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { resolveAssetUrl } from "@/config/env";
 import {
   formatDurationMinutes,
   toArabicDigits,
 } from "@/shared/lib/arabic";
+import { isOptimizable } from "@/shared/lib/images";
+import { riseIn } from "@/shared/lib/riseIn";
 import { getLessonGradient } from "@/shared/lib/stage";
 import { StageBadge } from "@/shared/ui/StageBadge";
 import { CoverArt } from "@/shared/components/bio";
@@ -32,10 +34,9 @@ export function LessonDetailsHero() {
       />
 
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <motion.nav
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+        <nav
+          style={riseIn({ y: 0, duration: 0.4 })}
+          className="rise-in mb-6 flex items-center gap-2 text-sm text-muted-foreground"
         >
           <Link href="/" className="hover:text-primary">
             الرئيسية
@@ -46,15 +47,13 @@ export function LessonDetailsHero() {
           </Link>
           <span>/</span>
           <span className="font-semibold text-foreground">{lesson.title}</span>
-        </motion.nav>
+        </nav>
 
         <div className="grid gap-10 lg:grid-cols-5">
           <div className="lg:col-span-3">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="flex flex-wrap items-center gap-2"
+            <div
+              style={riseIn({ duration: 0.6 })}
+              className="rise-in flex flex-wrap items-center gap-2"
             >
               <StageBadge stage={lesson.stage} />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground shadow-soft">
@@ -82,31 +81,25 @@ export function LessonDetailsHero() {
                 </svg>
                 {toArabicDigits(lesson.chapters)} فصول
               </span>
-            </motion.div>
+            </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.6 }}
-              className="mt-5 text-3xl font-extrabold leading-tight sm:text-4xl lg:text-5xl"
+            <h1
+              style={riseIn({ delay: 0.1, duration: 0.6 })}
+              className="rise-in mt-5 text-3xl font-extrabold leading-tight sm:text-4xl lg:text-5xl"
             >
               {lesson.title}
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+            <p
+              style={riseIn({ delay: 0.2, duration: 0.6 })}
+              className="rise-in mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg"
             >
               {lesson.longDescription}
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              className="mt-8 flex flex-wrap items-center gap-3"
+            <div
+              style={riseIn({ delay: 0.3, duration: 0.6 })}
+              className="rise-in mt-8 flex flex-wrap items-center gap-3"
             >
               <Link
                 href={`/player/${lesson.slug}`}
@@ -125,14 +118,12 @@ export function LessonDetailsHero() {
               >
                 ارجع لكل الدروس
               </Link>
-            </motion.div>
+            </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            className="lg:col-span-2"
+          <div
+            style={riseIn({ y: 0, scale: 0.95, delay: 0.1 })}
+            className="rise-in lg:col-span-2"
           >
             <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-2 shadow-elegant">
               <div
@@ -140,10 +131,14 @@ export function LessonDetailsHero() {
                 style={{ background: gradient }}
               >
                 {thumbnailSrc && (
-                  <img
+                  <Image
                     src={thumbnailSrc}
                     alt={lesson.title}
-                    className="absolute inset-0 size-full object-cover"
+                    fill
+                    priority
+                    sizes="(min-width: 1152px) 430px, (min-width: 1024px) 38vw, 100vw"
+                    unoptimized={!isOptimizable(thumbnailSrc)}
+                    className="object-cover"
                   />
                 )}
 
@@ -170,7 +165,7 @@ export function LessonDetailsHero() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

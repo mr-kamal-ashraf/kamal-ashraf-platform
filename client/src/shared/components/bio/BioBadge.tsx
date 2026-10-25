@@ -24,7 +24,10 @@ export function BioBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border bg-card/80 py-1 pe-4 ps-1 text-xs font-bold sm:text-[13px]",
+        // Drawn above its section (z-20, it overlaps nothing): content drawn
+        // after a moving element is split into extra layers by the browser,
+        // and the swaying cell would do that to the whole section.
+        "relative z-20 inline-flex items-center gap-2 rounded-full border bg-card/80 py-1 pe-4 ps-1 text-xs font-bold sm:text-[13px]",
         isHighlight
           ? "border-highlight/25 text-highlight"
           : "border-primary/20 text-primary",
