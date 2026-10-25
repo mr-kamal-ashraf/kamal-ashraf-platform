@@ -40,13 +40,13 @@ export const SITE = {
     whatsappLink: "https://wa.me/201070010209",
     credit: "من صنع وتطوير",
   },
+  /** Defaults until the teacher sets them in the admin panel. The WhatsApp
+   *  and call links are built from these numbers (site-settings/resolve.ts). */
   contact: {
-    phone: "+20 11 1310 8703",
-    whatsapp: "+20 11 1310 8703",
-    whatsappLink: "https://wa.me/201113108703",
-    telLink: "tel:+201113108703",
+    phone: "+20 12 82501002",
+    whatsapp: "+20 12 82501002",
     email: "info@ostaz-arabic.com",
-    facebook: "https://www.facebook.com/profile.php?id=61551478307049",
+    facebook: "https://www.facebook.com/share/1DmfuWTssX/",
     instagram: "https://instagram.com/",
     youtube: "https://youtube.com/",
     tiktok: "https://tiktok.com/",
