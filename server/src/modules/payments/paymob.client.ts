@@ -8,7 +8,7 @@ import { logger } from "../../shared/utils/logger";
 /**
  * Thin client for Paymob's classic "Accept" flow:
  *   auth token -> order -> payment key -> (card) iframe URL
- *                                      -> (wallet) pay request,
+ *                                      -> (wallet / kiosk) pay request,
  * Paymob's Intention API for card fields embedded in our page (Pixel), plus
  * HMAC verification for the transaction callback (the same for every method
  * and both flows).
@@ -30,7 +30,8 @@ function integrationIdFor(method: PaymentMethod): string | undefined {
       ? env.PAYMOB_INTEGRATION_ID
       : undefined;
   }
-  return env.PAYMOB_WALLET_INTEGRATION_ID;
+  if (method === PAYMENT_METHOD.WALLET) return env.PAYMOB_WALLET_INTEGRATION_ID;
+  return env.PAYMOB_KIOSK_INTEGRATION_ID;
 }
 
 /** The methods students can choose, in display order. */
@@ -192,7 +193,7 @@ interface PaymentKeyInput {
   orderId: string;
   currency: string;
   billing: BillingData;
-  /** How long the key stays valid. */
+  /** How long the key (and a kiosk reference made from it) stays valid. */
   expirationSeconds: number;
 }
 
@@ -288,9 +289,9 @@ export function paymobPublicKey(): string {
   return env.PAYMOB_PUBLIC_KEY ?? "";
 }
 
-/** Step 4 for wallets — Paymob's pay request with a payment source. */
+/** Step 4 for wallets / kiosk — Paymob's pay request with a payment source. */
 async function pay(
-  source: { identifier: string; subtype: "WALLET" },
+  source: { identifier: string; subtype: "WALLET" | "AGGREGATOR" },
   paymentToken: string,
 ): Promise<Record<string, unknown>> {
   const { data } = await http.post(`${env.PAYMOB_BASE_URL}/acceptance/payments/pay`, {
@@ -327,6 +328,29 @@ export async function payWithWallet(
       "تعذر بدء الدفع بالمحفظة. اتأكد إن الرقم عليه محفظة (فودافون كاش أو غيرها) وحاول تاني.",
       "WALLET_PAY_FAILED",
     );
+  }
+}
+
+/**
+ * Kiosk: Paymob issues a bill reference the student pays in cash at any Aman
+ * or Masary outlet. The transaction stays pending until then; the webhook
+ * grants the course once it's paid. An answer without a plain reference (the
+ * thing the student reads out at the outlet) is treated as a failure.
+ */
+export async function payAtKiosk(
+  paymentToken: string,
+): Promise<{ reference: string; transactionId: string | null }> {
+  try {
+    const data = await pay({ identifier: "AGGREGATOR", subtype: "AGGREGATOR" }, paymentToken);
+    const inner = (data.data ?? {}) as Record<string, unknown>;
+    const reference = String(inner.bill_reference ?? data.bill_reference ?? "").trim();
+    if (!/^[0-9A-Za-z-]{4,30}$/.test(reference)) {
+      throw new Error(`no usable bill reference in kiosk response: ${JSON.stringify(data)}`);
+    }
+    return { reference, transactionId: data.id !== undefined ? String(data.id) : null };
+  } catch (err) {
+    logger.error("Paymob kiosk pay failed", { detail: payErrorDetail(err) });
+    throw ApiError.internal("تعذر تجهيز رقم الدفع. حاول تاني بعد شوية.");
   }
 }
 

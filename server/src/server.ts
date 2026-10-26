@@ -5,6 +5,12 @@ import { logger } from "./shared/utils/logger";
 import { seedAdmin } from "./seeds/seedAdmin";
 import { callRegisterPlatform } from "./modules/ai/ai.service";
 import { ensureAiJobIndexes } from "./modules/ai/ai-job.model";
+import { ensurePaymentIndexes } from "./modules/payments/payment.model";
+import { ensureLessonIndexes } from "./modules/lessons/lesson.model";
+import {
+  startLessonPublishWatcher,
+  stopLessonPublishWatcher,
+} from "./modules/lessons/lesson-publish-watcher";
 import {
   activeJobCount,
   waitForActiveJobs,
@@ -33,6 +39,14 @@ async function bootstrap() {
     await ensureAiJobIndexes().catch((error) =>
       logger.error("Could not create the AI jobs TTL index", { error }),
     );
+    // One open kiosk reference per student per course (autoIndex is off in production).
+    await ensurePaymentIndexes().catch((error) =>
+      logger.error("Could not create the payment indexes", { error }),
+    );
+    // Finds the lessons waiting to be published once their video is ready.
+    await ensureLessonIndexes().catch((error) =>
+      logger.error("Could not create the lesson indexes", { error }),
+    );
 
     const app = createApp();
 
@@ -53,6 +67,9 @@ async function bootstrap() {
       // still serves normally, and sends become logged no-ops until the
       // number is linked (scan the QR from the admin panel: WhatsApp page).
       void initWhatsappBridge();
+
+      // Lessons the teacher asked to publish once their video is ready.
+      startLessonPublishWatcher();
     });
 
     /**
@@ -72,6 +89,7 @@ async function bootstrap() {
           `Waiting up to ${JOB_DRAIN_MS / 1000}s for ${jobsRunning} AI job(s) to finish`,
         );
       }
+      stopLessonPublishWatcher();
       server.close(async () => {
         await waitForActiveJobs(JOB_DRAIN_MS);
         await shutdownWhatsappBridge();

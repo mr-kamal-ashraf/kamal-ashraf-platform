@@ -13,10 +13,13 @@ import { env } from "../../config/env";
 import { logger } from "../../shared/utils/logger";
 import {
   ENROLLMENT_STATUS,
+  PAYMENT_METHOD,
+  PAYMENT_STATUS,
   STAGE_LABELS,
   type Stage,
 } from "../../config/constants";
 import { sendTextMessage } from "../notifications/whatsapp.client";
+import { isKioskOffered } from "../payments/kiosk";
 import { isAiRepliesEnabled } from "../whatsapp-bridge/whatsapp-bridge.service";
 import {
   BEHIND_LESSON_DAYS_DEFAULT,
@@ -251,12 +254,26 @@ export async function getStudentSupportContext(
     .limit(10)
     .populate<{ courseId: { title: string } | null }>("courseId", "title")
     .lean();
+  const now = Date.now();
+  const kioskOn = isKioskOffered();
   const recent_payments = payments.map((p) => ({
     course_title: (p.courseId as { title?: string } | null)?.title ?? "كورس",
     amount: p.amount,
     currency: p.currency,
     status: p.status,
     source: p.provider ?? null,
+    method: p.method,
+    // A cash reference still waiting at Aman / Masary: lets the agent give it
+    // back to a student who lost it (this is their own number, checked by
+    // phone) — while paying cash is switched on.
+    ...(kioskOn &&
+    p.method === PAYMENT_METHOD.KIOSK &&
+    p.status === PAYMENT_STATUS.PENDING &&
+    p.kioskReference &&
+    p.expiresAt &&
+    p.expiresAt.getTime() > now
+      ? { kiosk_reference: p.kioskReference, kiosk_expires_at: p.expiresAt.toISOString() }
+      : {}),
     date: p.createdAt.toISOString(),
   }));
 

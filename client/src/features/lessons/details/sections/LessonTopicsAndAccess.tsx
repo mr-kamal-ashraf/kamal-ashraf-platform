@@ -33,8 +33,7 @@ export function LessonTopicsAndAccess() {
         </ul>
       </div>
 
-      <aside className="relative overflow-hidden rounded-3xl border border-primary/30 bg-card p-6 shadow-elegant">
-        <span className="absolute inset-x-0 top-0 h-1.5 bg-gradient-brand" />
+      <aside className="card-strata relative overflow-hidden rounded-3xl p-6">
 
         <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-brand">
           <svg className="size-6" viewBox="0 0 24 24" fill="currentColor">

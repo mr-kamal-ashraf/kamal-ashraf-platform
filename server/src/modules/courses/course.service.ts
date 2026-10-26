@@ -24,6 +24,14 @@ import type {
 import type { Stage } from "../../config/constants";
 import { logger } from "../../shared/utils/logger";
 import { buildSafeRegex } from "../../shared/utils/regex";
+import {
+  firstFreeSlug,
+  isDuplicateSlugError,
+  slugFamily,
+  slugFromTitle,
+  withRandomTail,
+} from "../../shared/utils/slug";
+import { withoutUndefined } from "../../shared/utils/object";
 
 export type BulkCourseAction = "publish" | "unpublish" | "delete";
 
@@ -40,18 +48,28 @@ export async function isCourseSlugTaken(slug: string, exceptId?: string): Promis
   return !!(await Course.exists(filter));
 }
 
-/** Creates a new course. New courses start unpublished. */
+/** The title's link, numbered when another course already has it. */
+async function freeCourseSlug(title: string): Promise<string> {
+  const base = slugFromTitle(title, "course");
+  const taken = await Course.distinct("slug", { slug: slugFamily(base) });
+  return firstFreeSlug(base, new Set(taken));
+}
+
+/**
+ * Creates a new course. New courses start unpublished. Without a link, one is
+ * made from the title (the teacher never has to type one).
+ */
 export async function createCourse(
   input: CreateCourseInput,
 ): Promise<CourseDocument> {
-  const existing = await Course.findOne({ slug: input.slug });
-  if (existing) {
+  if (input.slug && (await Course.exists({ slug: input.slug }))) {
     throw ApiError.conflict("الرابط ده مستخدم قبل كده", "SLUG_TAKEN");
   }
 
-  return Course.create({
+  const slug = input.slug ?? (await freeCourseSlug(input.title));
+  const fields = {
     title: input.title,
-    slug: input.slug,
+    slug,
     description: input.description,
     longDescription: input.longDescription,
     stage: input.stage,
@@ -60,7 +78,15 @@ export async function createCourse(
     thumbnailGradient: input.thumbnailGradient ?? null,
     order: input.order,
     isPublished: false,
-  });
+  };
+  try {
+    return await Course.create(fields);
+  } catch (err) {
+    if (!isDuplicateSlugError(err)) throw err;
+    if (input.slug) throw ApiError.conflict("الرابط ده مستخدم قبل كده", "SLUG_TAKEN");
+    // Another course took the same free link at the same moment.
+    return Course.create({ ...fields, slug: withRandomTail(slug) });
+  }
 }
 
 /**
@@ -87,7 +113,8 @@ export async function updateCourse(
 
   const stageChanged = input.stage !== undefined && input.stage !== course.stage;
 
-  Object.assign(course, input);
+  // A field sent empty on purpose (an empty link) leaves the stored one alone.
+  Object.assign(course, withoutUndefined(input));
   await course.save();
 
   if (stageChanged) {

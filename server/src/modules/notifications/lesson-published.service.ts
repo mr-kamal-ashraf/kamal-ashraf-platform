@@ -1,5 +1,6 @@
 import { env } from "../../config/env";
 import { ENROLLMENT_STATUS } from "../../config/constants";
+import { Course } from "../courses/course.model";
 import { Enrollment } from "../enrollments/enrollment.model";
 import { User } from "../users/user.model";
 import { logger } from "../../shared/utils/logger";
@@ -106,6 +107,38 @@ export async function notifyCourseOwnersAboutPublishedLesson(
     logger.error("[lesson-notification] publish announcement failed", {
       courseId: input.courseId,
       lessonSlug: input.lessonSlug,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Tells each lesson's course owners it's out — for lessons that just became
+ * public (the teacher's click, a bulk publish, or "publish when ready"). Runs
+ * detached: publishing stays fast and succeeds even if WhatsApp is down.
+ */
+export async function announcePublishedLessons(
+  lessons: Array<{ courseId: unknown; title: string; slug: string }>,
+): Promise<void> {
+  if (lessons.length === 0) return;
+  try {
+    const courseIds = [...new Set(lessons.map((lesson) => String(lesson.courseId)))];
+    const courses = await Course.find({ _id: { $in: courseIds } })
+      .select("_id title")
+      .lean();
+    const courseTitles = new Map(courses.map((course) => [String(course._id), course.title]));
+    for (const lesson of lessons) {
+      const courseTitle = courseTitles.get(String(lesson.courseId));
+      if (!courseTitle) continue;
+      void notifyCourseOwnersAboutPublishedLesson({
+        courseId: String(lesson.courseId),
+        courseTitle,
+        lessonTitle: lesson.title,
+        lessonSlug: lesson.slug,
+      });
+    }
+  } catch (error) {
+    logger.error("[lesson-notification] could not prepare the announcements", {
       error: error instanceof Error ? error.message : String(error),
     });
   }

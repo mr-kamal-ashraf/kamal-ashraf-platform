@@ -141,7 +141,9 @@ export function LessonsCarousel() {
         {isLoading ? (
           <LoadingScreen className="rounded-none border-0 bg-transparent py-10" />
         ) : hasCourses ? (
-          <div className="relative w-full">
+          // The slider comes in as one piece — never card by card, which
+          // could leave cards off to the side (or remounted) invisible.
+          <Reveal margin="-50px 0px" rise={30} className="relative w-full">
             <CoursesSlider
               courses={courses}
               onSwiper={(s) => {
@@ -159,7 +161,7 @@ export function LessonsCarousel() {
                   "linear-gradient(to left, transparent, var(--background) 95%)",
               }}
             />
-          </div>
+          </Reveal>
         ) : (
           <LessonsEmptyState />
         )}

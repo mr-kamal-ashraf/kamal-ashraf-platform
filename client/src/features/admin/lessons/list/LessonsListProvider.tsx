@@ -12,12 +12,13 @@ import {
 import { toast } from "sonner";
 import { adminLessonsApi, isApiError } from "@/api";
 import type { BulkLessonAction } from "@/api/admin/lessons";
-import type { Lesson, PaginatedResult, Stage } from "@/api/types";
+import type { Lesson, LessonVideoStatus, PaginatedResult, Stage } from "@/api/types";
 import { useConfirm } from "@/features/admin/shared/confirm/ConfirmProvider";
 import { useQueryFilters } from "@/shared/hooks/useQueryFilters";
 import { readEnumParam, readTextParam } from "@/shared/lib/query";
 import { STAGE_VALUES } from "@/shared/lib/stage";
 import { useDebounced } from "@/shared/hooks/useDebounced";
+import { useVideoWatch, withVideoStatus } from "../videoReadiness";
 
 /** "" = every lesson, "true" = published only, "false" = drafts only. */
 export type PublishedFilter = "" | "true" | "false";
@@ -40,7 +41,10 @@ interface LessonsListContextValue {
   setSearch: (v: string) => void;
   setPublished: (v: PublishedFilter) => void;
   refresh: () => Promise<void>;
-  togglePublish: (lesson: Lesson) => Promise<void>;
+  /** The lesson as the server now has it (after publish / hide). */
+  replaceLesson: (lesson: Lesson) => void;
+  /** How far each video being prepared is (0–100), when known. */
+  videoProgress: Record<string, number | null>;
   deleteLesson: (lesson: Lesson) => Promise<void>;
   selectedLessonIds: ReadonlySet<string>;
   selectedCount: number;
@@ -100,18 +104,27 @@ export function LessonsListProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const togglePublish = useCallback(
-    async (lesson: Lesson) => {
-      try {
-        await adminLessonsApi.togglePublish(lesson._id, !lesson.isPublished);
-        toast.success(lesson.isPublished ? "تم الإخفاء" : "تم النشر");
-        await refresh();
-      } catch (err) {
-        toast.error(isApiError(err) ? err.message : "حصل خطأ");
-      }
-    },
-    [refresh],
+  const replaceLesson = useCallback(
+    (updated: Lesson) =>
+      setData((prev) =>
+        prev && { ...prev, items: prev.items.map((l) => (l._id === updated._id ? updated : l)) },
+      ),
+    [],
   );
+
+  // A video finished being prepared (or broke, or the lesson went live by
+  // itself) while the list was open — one watcher for the whole list.
+  const updateLessonVideo = useCallback(
+    (lessonId: string, video: LessonVideoStatus) =>
+      setData((prev) =>
+        prev && {
+          ...prev,
+          items: prev.items.map((l) => (l._id === lessonId ? withVideoStatus(l, video) : l)),
+        },
+      ),
+    [],
+  );
+  const videoProgress = useVideoWatch(data?.items ?? [], updateLessonVideo);
 
   const deleteLesson = useCallback(
     async (lesson: Lesson) => {
@@ -167,7 +180,7 @@ export function LessonsListProvider({ children }: { children: ReactNode }) {
       if (isBulkSubmitting || selectedLessonIds.size === 0) return;
       const count = selectedLessonIds.size;
       const labels = {
-        publish: { title: "نشر دروس متعددة", message: `هتنشر ${count} درس وهيوصل إشعار للطلاب المشتركين في الكورس. كل درس لازم يكون عليه فيديو. متأكد؟`, confirmLabel: "نشر الدروس", tone: "default" as const, done: "تم نشر" },
+        publish: { title: "نشر دروس متعددة", message: `هتنشر ${count} درس وهيوصل إشعار للطلاب المشتركين في الكورس. اللي الفيديو بتاعه لسه بيتجهز هيتنشر لوحده أول ما يخلص، واللي من غير فيديو مش هيتنشر. متأكد؟`, confirmLabel: "نشر الدروس", tone: "default" as const, done: "تم نشر" },
         unpublish: { title: "إخفاء دروس متعددة", message: `هتخفي ${count} درس من الطلاب. متأكد؟`, confirmLabel: "إخفاء الدروس", tone: "danger" as const, done: "تم إخفاء" },
         delete: { title: "حذف دروس نهائيًا", message: `هتحذف ${count} درس وفيديوهاته نهائيًا. لا يمكن التراجع عن الإجراء. متأكد؟`, confirmLabel: "حذف نهائي", tone: "danger" as const, done: "تم حذف" },
       }[action];
@@ -177,7 +190,10 @@ export function LessonsListProvider({ children }: { children: ReactNode }) {
       try {
         const result = await adminLessonsApi.bulkAction(action, [...selectedLessonIds]);
         clearSelection();
-        toast.success(`${labels.done} ${result.processed} درس`);
+        const scheduled = result.scheduledIds?.length ?? 0;
+        const done = result.processed - scheduled;
+        if (done > 0) toast.success(`${labels.done} ${done} درس`);
+        if (scheduled > 0) toast.success(`${scheduled} درس هيتنشروا لوحدهم أول ما الفيديو يجهز`);
         if (result.missingIds.length || result.failedIds.length) {
           toast.error(`${result.missingIds.length + result.failedIds.length} درس لم يكتمل الإجراء عليه`);
         }
@@ -202,7 +218,8 @@ export function LessonsListProvider({ children }: { children: ReactNode }) {
       setSearch: (v) => setFilter("search", v),
       setPublished: (v) => setFilter("published", v),
       refresh,
-      togglePublish,
+      replaceLesson,
+      videoProgress,
       deleteLesson,
       selectedLessonIds,
       selectedCount: selectedLessonIds.size,
@@ -220,7 +237,8 @@ export function LessonsListProvider({ children }: { children: ReactNode }) {
       data,
       isLoading,
       refresh,
-      togglePublish,
+      replaceLesson,
+      videoProgress,
       deleteLesson,
       selectedLessonIds,
       isBulkSubmitting,

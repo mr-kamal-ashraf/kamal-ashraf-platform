@@ -142,10 +142,6 @@ function FaqRow({
           open ? "border-primary/30 shadow-soft" : "border-border hover:border-primary/25",
         )}
       >
-        {/* a thin brand line along the top of the open card */}
-        {open && (
-          <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-gradient-brand" />
-        )}
         <h3>
           <button
             id={buttonId}

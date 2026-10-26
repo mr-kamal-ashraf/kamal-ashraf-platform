@@ -240,6 +240,10 @@ const envSchema = z.object({
   PAYMOB_INTEGRATION_ID: z.string().optional(),    // the card payment integration id
   PAYMOB_IFRAME_ID: z.string().optional(),         // the iframe id used to render checkout
   PAYMOB_WALLET_INTEGRATION_ID: z.string().optional(), // mobile wallets integration id
+  PAYMOB_KIOSK_INTEGRATION_ID: z.string().optional(),  // cash at Aman / Masary outlets (Kiosk) integration id
+  // How long a kiosk reference stays payable — set it to what Paymob confirms
+  // for your account (the student is shown this deadline).
+  PAYMOB_KIOSK_EXPIRY_HOURS: z.coerce.number().int().min(1).max(168).default(48),
   PAYMOB_HMAC_SECRET: z.string().optional(),       // HMAC secret used to verify callbacks
   PAYMOB_BASE_URL: z
     .string()

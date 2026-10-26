@@ -12,6 +12,7 @@ import {
   adminUploadVideo,
   adminUploadThumbnail,
   adminClearThumbnail,
+  adminReorder,
 } from "./lesson.controller";
 import {
   createLessonSchema,
@@ -19,6 +20,7 @@ import {
   togglePublishSchema,
   listLessonsQuerySchema,
   bulkLessonActionSchema,
+  reorderLessonsSchema,
 } from "./lesson.validation";
 import { validate } from "../../shared/middlewares/validate.middleware";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
@@ -62,6 +64,12 @@ router.post(
 );
 
 /**
+ * PUT /admin/lessons/order
+ * A course's lessons in the order students see them ({ courseId, lessonIds }).
+ */
+router.put("/order", validate(reorderLessonsSchema), asyncHandler(adminReorder));
+
+/**
  * GET /admin/lessons/:id
  * Returns full details of a single lesson including Bunny video status and thumbnail.
  * Used by the admin edit page to pre-fill the form.
@@ -88,6 +96,7 @@ router.patch("/:id", validate(updateLessonSchema), asyncHandler(adminUpdate));
  * PATCH /admin/lessons/:id/publish
  * Toggles the isPublished status of a lesson (publish / unpublish).
  * Rejects with NO_VIDEO_UPLOADED if the lesson has no Bunny video attached.
+ * With whenReady, a video still being prepared schedules the publish instead.
  * A lesson must be published before students can see it.
  */
 router.patch(

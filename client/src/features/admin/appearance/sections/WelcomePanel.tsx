@@ -221,7 +221,7 @@ export function WelcomePanel() {
       </div>
 
       <PreviewFrame>
-        <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-7 text-center shadow-elegant">
+        <div className="card-strata relative mx-auto w-full max-w-md overflow-hidden rounded-3xl p-7 text-center">
           <CourseWelcomeCard
             title={draft.title}
             message={draft.message}

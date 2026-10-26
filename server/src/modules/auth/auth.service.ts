@@ -29,6 +29,7 @@ import type {
   PasswordResetInput,
 } from "./auth.validation";
 import { logger } from "../../shared/utils/logger";
+import { platformName } from "../../shared/utils/platformName";
 import {
   clearLoginAttempts,
   lockAccount,
@@ -612,12 +613,6 @@ export async function changeStudentPassword(
 const PASSWORD_RESET_CODE_TTL_MS = 10 * 60 * 1000;
 const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_PASSWORD_RESET_ATTEMPTS = 5;
-
-/** "منصة أستاذ كمال أشرف" — or "منصتنا" when no name is set. */
-function platformName(): string {
-  const name = env.PLATFORM_NAME?.trim();
-  return name ? `منصة ${name}` : "منصتنا";
-}
 
 function buildPasswordResetMessage(code: string): string {
   return [

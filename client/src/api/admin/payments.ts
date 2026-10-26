@@ -1,4 +1,5 @@
 import { apiClient } from "../client";
+import type { PaymentMethod } from "../types";
 
 /**
  * Paid payments the teacher should refund (دفعات محتاجة استرجاع): money came
@@ -14,7 +15,7 @@ export interface RefundAlert {
   reason: RefundReason;
   amount: number;
   currency: string;
-  method: "card" | "wallet";
+  method: PaymentMethod;
   paidAt: string | null;
   merchantOrderId: string;
   paymobOrderId: string | null;

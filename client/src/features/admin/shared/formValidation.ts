@@ -2,10 +2,9 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { isApiError } from "@/api";
 
 /*
- * Step-by-step checks for the create-course / create-lesson wizards. The
- * rules mirror the server's (course.validation.ts / lesson.validation.ts) so
- * a mistake is caught on the step where it's typed — the wizard doesn't move
- * on until that step is right — instead of failing on the very last click.
+ * Checks for the course / lesson forms. The rules mirror the server's
+ * (course.validation.ts / lesson.validation.ts), so a mistake shows under its
+ * field before saving — not as a failed save.
  */
 
 /** Field → message; a field without a message is fine. */
@@ -37,9 +36,10 @@ export const contentRules = {
     if (length(value) > 500) return "الوصف القصير طويل — أقصى حد ٥٠٠ حرف.";
     return null;
   },
-  longDescription(value: string) {
-    if (!length(value)) return "اكتب الوصف التفصيلي.";
-    if (length(value) < 10) return "الوصف التفصيلي لازم يكون ١٠ حروف على الأقل.";
+  /** Optional: empty is fine (the short description stands in for it). */
+  optionalLongDescription(value: string) {
+    if (!length(value)) return null;
+    if (length(value) < 10) return "الوصف التفصيلي لازم يكون ١٠ حروف على الأقل — أو سيبه فاضي.";
     if (length(value) > 5000) return "الوصف التفصيلي طويل — أقصى حد ٥٠٠٠ حرف.";
     return null;
   },
@@ -83,8 +83,8 @@ export function serverFieldErrors(err: unknown): FieldErrors | null {
 }
 
 /**
- * Brings the first field in red into view and focuses it. `delay` covers a
- * step change (the new step mounts after the slide animation).
+ * Brings the first field in red into view and focuses it — opening the
+ * folded "more details" box it may sit in. `delay`: wait for it to render.
  */
 export function focusFirstInvalid(root: HTMLElement | null, delay = 0) {
   window.setTimeout(() => {
@@ -92,6 +92,8 @@ export function focusFirstInvalid(root: HTMLElement | null, delay = 0) {
       '[data-invalid="true"] :is(input, textarea, select)',
     );
     if (!field) return;
+    const folded = field.closest("details");
+    if (folded) folded.open = true;
     field.scrollIntoView({ block: "center", behavior: "smooth" });
     field.focus({ preventScroll: true });
   }, delay);
@@ -100,7 +102,7 @@ export function focusFirstInvalid(root: HTMLElement | null, delay = 0) {
 /**
  * Once a field is shown in red, its message follows what's typed: it updates
  * as the value changes and disappears the moment the value is right. Fields
- * that weren't flagged stay quiet until the next "التالي".
+ * that weren't flagged stay quiet until the next save.
  */
 export function useLiveRecheck<T extends object>(
   values: T,

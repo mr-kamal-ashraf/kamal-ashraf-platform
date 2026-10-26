@@ -1,4 +1,4 @@
-import { apiClient } from "../client";
+import { apiClient, type UploadOptions } from "../client";
 import type { Lesson, LessonVideoStatus, PaginatedResult, Stage } from "../types";
 
 export interface LessonAdminFilters {
@@ -13,10 +13,15 @@ export interface LessonAdminFilters {
 export interface LessonCreatePayload {
   courseId: string;
   title: string;
-  slug: string;
+  /** Left out: made from the title. */
+  slug?: string;
   description: string;
-  longDescription: string;
-  durationMinutes: number;
+  /** Empty: the lesson page shows the short description. */
+  longDescription?: string;
+  /** Left out: taken from the video once it's uploaded. */
+  durationMinutes?: number;
+  /** The duration follows the video's real length. */
+  durationAuto?: boolean;
   chapters?: number;
   topics?: string[];
   thumbnail?: string | null;
@@ -31,6 +36,7 @@ export type LessonUpdatePayload = Partial<{
   description: string;
   longDescription: string;
   durationMinutes: number;
+  durationAuto: boolean;
   chapters: number;
   topics: string[];
   thumbnail: string | null;
@@ -46,6 +52,8 @@ export interface BulkLessonActionResult {
   processedIds: string[];
   missingIds: string[];
   failedIds: string[];
+  /** Video still being prepared: published by itself once it's ready. */
+  scheduledIds: string[];
 }
 
 export const adminLessonsApi = {
@@ -73,10 +81,19 @@ export const adminLessonsApi = {
   update: (id: string, payload: LessonUpdatePayload) =>
     apiClient.patch<{ lesson: Lesson }>(`/admin/lessons/${id}`, payload),
 
-  togglePublish: (id: string, isPublished: boolean) =>
+  /**
+   * Publish or hide. `whenReady`: a video still being prepared doesn't refuse
+   * it — the lesson gets published by itself once the video is ready.
+   */
+  togglePublish: (id: string, isPublished: boolean, { whenReady = false } = {}) =>
     apiClient.patch<{ lesson: Lesson }>(`/admin/lessons/${id}/publish`, {
       isPublished,
+      whenReady,
     }),
+
+  /** A course's lessons in the order students see them (all of them). */
+  reorder: (courseId: string, lessonIds: string[]) =>
+    apiClient.put<null>("/admin/lessons/order", { courseId, lessonIds }),
 
   delete: (id: string) => apiClient.delete<null>(`/admin/lessons/${id}`),
 
@@ -86,12 +103,14 @@ export const adminLessonsApi = {
       lessonIds,
     }),
 
-  uploadVideo: (id: string, file: File) => {
+  /** Reports how much went out (`onProgress`) — a video can take minutes. */
+  uploadVideo: (id: string, file: File, options?: UploadOptions) => {
     const formData = new FormData();
     formData.append("video", file);
-    return apiClient.post<{ lesson: Lesson }>(
+    return apiClient.upload<{ lesson: Lesson }>(
       `/admin/lessons/${id}/video`,
       formData,
+      options,
     );
   },
 

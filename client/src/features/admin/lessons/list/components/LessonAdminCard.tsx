@@ -1,12 +1,15 @@
 import Link from "next/link";
 import type { Lesson } from "@/api/types";
 import { STAGE_LABELS } from "@/shared/lib/stage";
+import { LessonPublishButton } from "../../components/LessonPublishButton";
 import { PublishStatus } from "../../components/PublishStatus";
 import { VideoStatus } from "../../components/VideoStatus";
 
 interface LessonAdminCardProps {
   lesson: Lesson;
-  onTogglePublish: () => void;
+  /** The lesson as the server now has it (after publish / hide). */
+  onChange: (lesson: Lesson) => void;
+  videoProgress?: number | null;
   onDelete: () => void;
   selected: boolean;
   onToggleSelect: () => void;
@@ -14,7 +17,8 @@ interface LessonAdminCardProps {
 
 export function LessonAdminCard({
   lesson,
-  onTogglePublish,
+  onChange,
+  videoProgress,
   onDelete,
   selected,
   onToggleSelect,
@@ -30,7 +34,7 @@ export function LessonAdminCard({
           <div className="text-sm font-extrabold text-primary hover:underline">
             {lesson.title}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          <div className="mt-0.5 truncate text-[11px] text-muted-foreground" dir="ltr">
             {lesson.slug}
           </div>
         </Link>
@@ -50,36 +54,26 @@ export function LessonAdminCard({
         <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-bold">
           {STAGE_LABELS[lesson.stage]}
         </span>
-        <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-muted-foreground">
-          {lesson.durationMinutes} دقيقة
-        </span>
-        <VideoStatus uploaded={!!lesson.bunnyVideoId} />
+        {!(lesson.durationAuto && !lesson.videoDurationSeconds) && (
+          <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-muted-foreground">
+            {lesson.durationMinutes} دقيقة
+          </span>
+        )}
+        <VideoStatus lesson={lesson} progress={videoProgress} />
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
         <Link
           href={`/admin/lessons/${lesson._id}`}
           className="min-h-[40px] flex-1 rounded-lg bg-primary/10 px-3 py-2 text-center text-xs font-bold text-primary hover:bg-primary/15"
         >
           تفاصيل
         </Link>
-        <button
-          type="button"
-          onClick={onTogglePublish}
-          disabled={!lesson.isPublished && !lesson.bunnyVideoId}
-          title={
-            !lesson.isPublished && !lesson.bunnyVideoId
-              ? "ارفع فيديو الدرس من صفحة التعديل قبل النشر"
-              : undefined
-          }
-          className="min-h-[40px] flex-1 rounded-lg bg-muted px-3 py-2 text-xs font-bold hover:bg-muted-foreground/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {lesson.isPublished ? "إخفاء" : "نشر"}
-        </button>
+        <LessonPublishButton lesson={lesson} onChange={onChange} />
         <button
           type="button"
           onClick={onDelete}
-          className="min-h-[40px] rounded-lg bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-500/20"
+          className="min-h-[34px] rounded-lg bg-red-500/10 px-3 text-xs font-bold text-red-600 hover:bg-red-500/20"
         >
           حذف
         </button>

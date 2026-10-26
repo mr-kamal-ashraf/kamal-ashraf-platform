@@ -6,14 +6,20 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { adminLessonsApi, adminCoursesApi, isApiError } from "@/api";
-import type { CourseAdminItem, Lesson } from "@/api/types";
+import type { CourseAdminItem, Lesson, LessonVideoStatus } from "@/api/types";
 import { useConfirm } from "@/features/admin/shared/confirm/ConfirmProvider";
+import {
+  useUploadProgress,
+  type UploadProgress,
+} from "@/features/admin/shared/upload/useUploadProgress";
+import { useVideoWatch, withVideoStatus } from "../videoReadiness";
 
 interface EditLessonContextValue {
   lessonId: string;
@@ -21,26 +27,21 @@ interface EditLessonContextValue {
   courses: CourseAdminItem[];
   isLoading: boolean;
   error: string | null;
-  submitting: boolean;
-  uploadingVideo: boolean;
+  /** The video going up (null when no upload is running). */
+  videoUpload: UploadProgress | null;
   uploadingThumbnail: boolean;
-  /** Bunny's conversion progress (0–100) while the video is still converting. */
+  /** How far the video service is (0–100) while it prepares the video. */
   videoProgress: number | null;
-  setLesson: (l: Lesson) => void;
-  save: (e: React.FormEvent) => Promise<void>;
-  uploadVideo: (file: File, onDone: () => void) => Promise<void>;
-  uploadThumbnail: (file: File, onDone: () => void) => Promise<void>;
+  /** The lesson as the server now has it (after a save, a publish…). */
+  setLesson: (lesson: Lesson) => void;
+  uploadVideo: (file: File) => Promise<void>;
+  cancelVideoUpload: () => void;
+  uploadThumbnail: (file: File) => Promise<void>;
   clearThumbnail: () => Promise<void>;
-  togglePublish: () => Promise<void>;
   deleteLesson: () => Promise<void>;
 }
 
-const EditLessonContext = createContext<EditLessonContextValue | undefined>(
-  undefined,
-);
-
-/** How often the page asks whether Bunny has finished converting the video. */
-const VIDEO_CHECK_EVERY_MS = 8000;
+const EditLessonContext = createContext<EditLessonContextValue | undefined>(undefined);
 
 export function EditLessonProvider({
   lessonId,
@@ -51,25 +52,22 @@ export function EditLessonProvider({
 }) {
   const confirm = useConfirm();
   const router = useRouter();
-  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [lesson, setLessonState] = useState<Lesson | null>(null);
   const [courses, setCourses] = useState<CourseAdminItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
-  const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  const { progress: videoUpload, start, onProgress, reset } = useUploadProgress();
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const result = await adminLessonsApi.get(lessonId);
-        if (!cancelled) setLesson(result.lesson);
+        if (!cancelled) setLessonState(result.lesson);
       } catch (err) {
-        if (!cancelled) {
-          setError(isApiError(err) ? err.message : "حصل خطأ");
-        }
+        if (!cancelled) setError(isApiError(err) ? err.message : "حصل خطأ");
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -94,101 +92,54 @@ export function EditLessonProvider({
     };
   }, []);
 
-  // While Bunny is still converting the video, ask every few seconds (only on
-  // this page, only while it's on screen) so the status — and the publish
-  // button — update by themselves. Stops once the video is ready or failed.
-  const videoPending =
-    !!lesson?.bunnyVideoId &&
-    lesson.videoStatus !== "ready" &&
-    lesson.videoStatus !== "failed";
-  useEffect(() => {
-    if (!videoPending) return;
-    let cancelled = false;
-    let timer = 0;
-    const check = async () => {
-      if (document.visibilityState === "visible") {
-        try {
-          const video = await adminLessonsApi.videoStatus(lessonId);
-          if (cancelled) return;
-          setVideoProgress(video.encodeProgress);
-          setLesson((prev) =>
-            prev && {
-              ...prev,
-              videoStatus: video.videoStatus,
-              videoDurationSeconds: video.videoDurationSeconds,
-            },
-          );
-          if (video.videoStatus === "ready" || video.videoStatus === "failed") return;
-        } catch {
-          /* try again next round */
-        }
-      }
-      if (!cancelled) timer = window.setTimeout(check, VIDEO_CHECK_EVERY_MS);
-    };
-    timer = window.setTimeout(check, VIDEO_CHECK_EVERY_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [videoPending, lessonId]);
+  const setLesson = useCallback((l: Lesson) => setLessonState(l), []);
 
-  const save = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!lesson || submitting) return;
-      setSubmitting(true);
-      try {
-        const result = await adminLessonsApi.update(lessonId, {
-          title: lesson.title,
-          slug: lesson.slug,
-          description: lesson.description,
-          longDescription: lesson.longDescription,
-          courseId: lesson.courseId,
-          durationMinutes: lesson.durationMinutes,
-          chapters: lesson.chapters,
-          topics: lesson.topics.map((t) => t.trim()).filter(Boolean),
-        });
-        setLesson(result.lesson);
-        toast.success("تم تحديث بيانات الدرس");
-      } catch (err) {
-        toast.error(isApiError(err) ? err.message : "حصل خطأ");
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [lesson, lessonId, submitting],
+  // While the video is still being prepared, its state — and the publish
+  // button — update by themselves (see videoReadiness).
+  const onVideo = useCallback(
+    (_id: string, video: LessonVideoStatus) =>
+      setLessonState((prev) => (prev ? withVideoStatus(prev, video) : prev)),
+    [],
   );
+  const watch = useVideoWatch(lesson ? [lesson] : [], onVideo);
 
   const uploadVideo = useCallback(
-    async (file: File, onDone: () => void) => {
-      setUploadingVideo(true);
+    async (file: File) => {
+      const abort = new AbortController();
+      abortRef.current = abort;
+      start();
       try {
-        const result = await adminLessonsApi.uploadVideo(lessonId, file);
-        setLesson(result.lesson);
-        onDone();
-        toast.success("تم رفع الفيديو بنجاح");
-        router.push("/admin/lessons");
+        const result = await adminLessonsApi.uploadVideo(lessonId, file, {
+          onProgress,
+          signal: abort.signal,
+        });
+        setLessonState(result.lesson);
+        toast.success("الفيديو اترفع ✓ — بيتجهز دلوقتي وهتشوف حالته هنا.");
       } catch (err) {
         toast.error(
-          isApiError(err)
-            ? err.message
-            : "حصل خطأ أثناء رفع الفيديو، حاول تاني.",
+          isApiError(err) && err.code === "REQUEST_ABORTED"
+            ? "وقّفنا رفع الفيديو — الفيديو القديم زي ما هو."
+            : isApiError(err)
+              ? err.message
+              : "حصل خطأ أثناء رفع الفيديو، حاول تاني.",
         );
       } finally {
-        setUploadingVideo(false);
+        abortRef.current = null;
+        reset();
       }
     },
-    [lessonId, router],
+    [lessonId, start, onProgress, reset],
   );
 
+  const cancelVideoUpload = useCallback(() => abortRef.current?.abort(), []);
+
   const uploadThumbnail = useCallback(
-    async (file: File, onDone: () => void) => {
+    async (file: File) => {
       setUploadingThumbnail(true);
       try {
         const result = await adminLessonsApi.uploadThumbnail(lessonId, file);
-        setLesson(result.lesson);
-        onDone();
-        toast.success("تم رفع الصورة بنجاح");
+        setLessonState(result.lesson);
+        toast.success("اتحفظت صورة الدرس ✓");
       } catch (err) {
         toast.error(isApiError(err) ? err.message : "حصل خطأ");
       } finally {
@@ -199,56 +150,36 @@ export function EditLessonProvider({
   );
 
   const clearThumbnail = useCallback(async () => {
-    if (
-      !(await confirm({
-        title: "حذف الصورة",
-        message: "متأكد من حذف صورة الدرس؟",
-        confirmLabel: "حذف",
-        tone: "danger",
-      }))
-    )
-      return;
+    setUploadingThumbnail(true);
     try {
       const result = await adminLessonsApi.clearThumbnail(lessonId);
-      setLesson(result.lesson);
-      toast.success("تم حذف الصورة");
+      setLessonState(result.lesson);
+      toast.success("اتشالت صورة الدرس");
     } catch (err) {
       toast.error(isApiError(err) ? err.message : "حصل خطأ");
+    } finally {
+      setUploadingThumbnail(false);
     }
-  }, [lessonId, confirm]);
-
-  const togglePublish = useCallback(async () => {
-    if (!lesson) return;
-    try {
-      const result = await adminLessonsApi.togglePublish(
-        lessonId,
-        !lesson.isPublished,
-      );
-      setLesson(result.lesson);
-      toast.success(lesson.isPublished ? "تم الإخفاء" : "تم النشر");
-    } catch (err) {
-      toast.error(isApiError(err) ? err.message : "حصل خطأ");
-    }
-  }, [lesson, lessonId]);
+  }, [lessonId]);
 
   const deleteLesson = useCallback(async () => {
     if (
       !(await confirm({
         title: "حذف الدرس",
-        message: "متأكد من حذف الدرس؟ هذا الإجراء لا يمكن التراجع عنه.",
-        confirmLabel: "حذف",
+        message: `هيتحذف درس «${lesson?.title ?? ""}» والفيديو بتاعه. مفيش تراجع بعد كده.`,
+        confirmLabel: "حذف الدرس",
         tone: "danger",
       }))
     )
       return;
     try {
       await adminLessonsApi.delete(lessonId);
-      toast.success("تم حذف الدرس");
-      router.push("/admin/lessons");
+      toast.success("الدرس اتحذف");
+      router.push(lesson ? `/admin/courses/${lesson.courseId}` : "/admin/lessons");
     } catch (err) {
       toast.error(isApiError(err) ? err.message : "حصل خطأ");
     }
-  }, [lessonId, router, confirm]);
+  }, [lessonId, lesson, router, confirm]);
 
   const value = useMemo<EditLessonContextValue>(
     () => ({
@@ -257,16 +188,14 @@ export function EditLessonProvider({
       courses,
       isLoading,
       error,
-      submitting,
-      uploadingVideo,
+      videoUpload,
       uploadingThumbnail,
-      videoProgress,
+      videoProgress: watch[lessonId] ?? null,
       setLesson,
-      save,
       uploadVideo,
+      cancelVideoUpload,
       uploadThumbnail,
       clearThumbnail,
-      togglePublish,
       deleteLesson,
     }),
     [
@@ -275,29 +204,23 @@ export function EditLessonProvider({
       courses,
       isLoading,
       error,
-      submitting,
-      uploadingVideo,
+      videoUpload,
       uploadingThumbnail,
-      videoProgress,
-      save,
+      watch,
+      setLesson,
       uploadVideo,
+      cancelVideoUpload,
       uploadThumbnail,
       clearThumbnail,
-      togglePublish,
       deleteLesson,
     ],
   );
 
-  return (
-    <EditLessonContext.Provider value={value}>
-      {children}
-    </EditLessonContext.Provider>
-  );
+  return <EditLessonContext.Provider value={value}>{children}</EditLessonContext.Provider>;
 }
 
 export function useEditLesson() {
   const ctx = useContext(EditLessonContext);
-  if (!ctx)
-    throw new Error("useEditLesson must be used within EditLessonProvider");
+  if (!ctx) throw new Error("useEditLesson must be used within EditLessonProvider");
   return ctx;
 }

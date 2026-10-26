@@ -4,6 +4,7 @@ import Link from "next/link";
 import { STAGE_LABELS } from "@/shared/lib/stage";
 import { useLessonsList } from "../LessonsListProvider";
 import { LessonAdminCard } from "../components/LessonAdminCard";
+import { LessonPublishButton } from "../../components/LessonPublishButton";
 import { PublishStatus } from "../../components/PublishStatus";
 import { VideoStatus } from "../../components/VideoStatus";
 import { LoadingScreen } from "@/shared/ui/LoadingScreen";
@@ -12,7 +13,8 @@ export function LessonsTable() {
   const {
     isLoading,
     data,
-    togglePublish,
+    replaceLesson,
+    videoProgress,
     deleteLesson,
     isLessonSelected,
     toggleLessonSelection,
@@ -41,7 +43,8 @@ export function LessonsTable() {
           <li key={lesson._id}>
             <LessonAdminCard
               lesson={lesson}
-              onTogglePublish={() => togglePublish(lesson)}
+              onChange={replaceLesson}
+              videoProgress={videoProgress[lesson._id]}
               onDelete={() => deleteLesson(lesson)}
               selected={isLessonSelected(lesson._id)}
               onToggleSelect={() => toggleLessonSelection(lesson._id)}
@@ -101,7 +104,7 @@ export function LessonsTable() {
                     >
                       {lesson.title}
                     </Link>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground" dir="ltr">
                       {lesson.slug}
                     </div>
                   </td>
@@ -109,33 +112,23 @@ export function LessonsTable() {
                     {STAGE_LABELS[lesson.stage]}
                   </td>
                   <td className="px-4 py-3 text-xs">
-                    {lesson.durationMinutes} دقيقة
+                    {lesson.durationAuto && !lesson.videoDurationSeconds
+                      ? "—"
+                      : `${lesson.durationMinutes} دقيقة`}
                   </td>
                   <td className="px-4 py-3 text-xs">
-                    <VideoStatus uploaded={!!lesson.bunnyVideoId} />
+                    <VideoStatus lesson={lesson} progress={videoProgress[lesson._id]} />
                   </td>
                   <td className="px-4 py-3 text-xs">
                     <PublishStatus published={lesson.isPublished} />
                   </td>
                   <td className="px-4 py-3 text-xs">
                     <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => togglePublish(lesson)}
-                        disabled={!lesson.isPublished && !lesson.bunnyVideoId}
-                        title={
-                          !lesson.isPublished && !lesson.bunnyVideoId
-                            ? "ارفع فيديو الدرس من صفحة التعديل قبل النشر"
-                            : undefined
-                        }
-                        className="rounded-lg bg-muted px-2.5 py-1 font-bold hover:bg-muted-foreground/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {lesson.isPublished ? "إخفاء" : "نشر"}
-                      </button>
+                      <LessonPublishButton lesson={lesson} onChange={replaceLesson} />
                       <button
                         type="button"
                         onClick={() => deleteLesson(lesson)}
-                        className="rounded-lg bg-red-500/10 px-2.5 py-1 font-bold text-red-600 hover:bg-red-500/20"
+                        className="min-h-[34px] rounded-lg bg-red-500/10 px-3 font-bold text-red-600 hover:bg-red-500/20"
                       >
                         حذف
                       </button>

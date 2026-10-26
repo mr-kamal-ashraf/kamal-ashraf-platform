@@ -65,9 +65,12 @@ export interface Lesson {
   title: string;
   slug: string;
   description: string;
+  /** "": the short description stands in for it. */
   longDescription: string;
   stage: Stage;
   durationMinutes: number;
+  /** Admin only — the duration follows the video's real length. */
+  durationAuto?: boolean;
   chapters: number;
   topics: string[];
   bunnyVideoId: string | null;
@@ -77,6 +80,8 @@ export interface Lesson {
   thumbnail: string | null;
   thumbnailGradient: string | null;
   isPublished: boolean;
+  /** Admin only — when the teacher asked to publish it once its video is ready. */
+  publishWhenReady?: string | null;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -90,6 +95,10 @@ export interface LessonVideoStatus {
   videoDurationSeconds: number;
   /** 0–100 while converting, when Bunny reported it. */
   encodeProgress: number | null;
+  /** The lesson as it stands now — it may have just been published by itself. */
+  durationMinutes: number;
+  isPublished: boolean;
+  publishWhenReady: string | null;
 }
 
 export interface LessonPreview {
@@ -302,6 +311,8 @@ export interface CourseDetailResponse {
   };
   owned: boolean;
   canBuy: boolean;
+  /** A cash reference this student still hasn't paid (null otherwise). */
+  pendingKiosk?: KioskReference | null;
   lessons: CourseLessonRow[];
 }
 
@@ -329,7 +340,16 @@ export interface EnrollmentRecord {
 }
 
 /** How a student pays online (all through Paymob). */
-export type PaymentMethod = "card" | "wallet";
+export type PaymentMethod = "card" | "wallet" | "kiosk";
+
+/** Cash at an Aman / Masary outlet: what the student pays with. */
+export interface KioskReference {
+  /** Our order reference — the checkout page checks the payment by it. */
+  merchantOrderId: string;
+  reference: string;
+  amount: number;
+  expiresAt: string;
+}
 
 export interface CheckoutResponse {
   free?: boolean;
@@ -343,6 +363,8 @@ export interface CheckoutResponse {
   iframeUrl?: string;
   /** wallet: the wallet provider's confirmation page (PIN / OTP). */
   redirectUrl?: string;
+  /** kiosk: the reference to pay with at Aman / Masary. */
+  kiosk?: KioskReference;
   paymentToken?: string;
   amount: number;
   courseId: string;

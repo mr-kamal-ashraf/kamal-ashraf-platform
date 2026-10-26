@@ -30,6 +30,14 @@ import type {
 import { VIDEO_STATUS, type Stage, type VideoStatus } from "../../config/constants";
 import { logger } from "../../shared/utils/logger";
 import { buildSafeRegex } from "../../shared/utils/regex";
+import {
+  firstFreeSlug,
+  isDuplicateSlugError,
+  slugFamily,
+  slugFromTitle,
+  withRandomTail,
+} from "../../shared/utils/slug";
+import { withoutUndefined } from "../../shared/utils/object";
 
 export type BulkLessonAction = "publish" | "unpublish" | "delete";
 
@@ -38,6 +46,8 @@ export interface BulkLessonActionResult {
   missingIds: string[];
   failedIds: string[];
   publishedNowIds: string[];
+  /** Video still being prepared: published by itself once it's ready. */
+  scheduledIds: string[];
 }
 
 /** True when another lesson already uses this link (the lesson being edited excluded). */
@@ -47,16 +57,36 @@ export async function isLessonSlugTaken(slug: string, exceptId?: string): Promis
   return !!(await Lesson.exists(filter));
 }
 
+/** The title's link, numbered when another lesson already has it. */
+async function freeLessonSlug(title: string): Promise<string> {
+  const base = slugFromTitle(title, "lesson");
+  const taken = await Lesson.distinct("slug", { slug: slugFamily(base) });
+  return firstFreeSlug(base, new Set(taken));
+}
+
+/** Where a lesson added to a course goes: after its last one. */
+async function nextLessonOrder(courseId: Types.ObjectId): Promise<number> {
+  const last = await Lesson.findOne({ courseId })
+    .sort({ order: -1 })
+    .select("order")
+    .lean();
+  return (last?.order ?? 0) + 1;
+}
+
+/** A video's real length as the minutes shown to students. */
+const minutesOf = (seconds: number) => Math.max(1, Math.round(seconds / 60));
+
 /**
  * Creates a new lesson in the database. New lessons start unpublished so
- * the admin can add a video before students can see it.
- * Throws SLUG_TAKEN if another lesson already uses the same slug.
+ * the admin can add a video before students can see it. Filled in when left
+ * out: the link (from the title), the duration (from the video, once it's
+ * uploaded) and the place in the course (after its last lesson).
+ * Throws SLUG_TAKEN if another lesson already uses the given slug.
  */
 export async function createLesson(
   input: CreateLessonInput,
 ): Promise<LessonDocument> {
-  const existing = await Lesson.findOne({ slug: input.slug });
-  if (existing) {
+  if (input.slug && (await Lesson.exists({ slug: input.slug }))) {
     throw ApiError.conflict("الرابط ده مستخدم قبل كده", "SLUG_TAKEN");
   }
 
@@ -67,21 +97,31 @@ export async function createLesson(
     throw ApiError.notFound("الكورس غير موجود", "COURSE_NOT_FOUND");
   }
 
-  return Lesson.create({
+  const slug = input.slug ?? (await freeLessonSlug(input.title));
+  const fields = {
     courseId: course._id,
     title: input.title,
-    slug: input.slug,
+    slug,
     description: input.description,
     longDescription: input.longDescription,
     stage: course.stage,
-    durationMinutes: input.durationMinutes,
+    durationMinutes: input.durationMinutes ?? 1,
+    durationAuto: input.durationAuto ?? input.durationMinutes === undefined,
     chapters: input.chapters,
     topics: input.topics,
     thumbnail: input.thumbnail ?? null,
     thumbnailGradient: input.thumbnailGradient ?? null,
-    order: input.order,
+    order: input.order ?? (await nextLessonOrder(course._id)),
     isPublished: false,
-  });
+  };
+  try {
+    return await Lesson.create(fields);
+  } catch (err) {
+    if (!isDuplicateSlugError(err)) throw err;
+    if (input.slug) throw ApiError.conflict("الرابط ده مستخدم قبل كده", "SLUG_TAKEN");
+    // Another lesson took the same free link at the same moment.
+    return Lesson.create({ ...fields, slug: withRandomTail(slug) });
+  }
 }
 
 /**
@@ -148,6 +188,9 @@ export async function uploadLessonVideo(
 
   lesson.bunnyVideoId = videoId;
   lesson.videoDurationSeconds = durationSeconds;
+  if (lesson.durationAuto && durationSeconds > 0) {
+    lesson.durationMinutes = minutesOf(durationSeconds);
+  }
   lesson.videoStatus = videoStatus;
   lesson.videoCheckedAt = new Date();
   try {
@@ -239,6 +282,14 @@ export async function syncLessonVideo(
   );
   lesson.videoStatus = status;
   lesson.videoDurationSeconds = durationSeconds;
+  // The shown duration follows the real one, unless the teacher typed their own.
+  if (durationSeconds > 0) {
+    await Lesson.updateOne(
+      { _id: lesson._id, bunnyVideoId: videoId, durationAuto: true },
+      { $set: { durationMinutes: minutesOf(durationSeconds) } },
+    );
+    if (lesson.durationAuto) lesson.durationMinutes = minutesOf(durationSeconds);
+  }
   return { status, durationSeconds, encodeProgress: info.encodeProgress ?? null };
 }
 
@@ -263,20 +314,29 @@ export async function updateLesson(
     }
   }
 
-  // Moving the lesson to another course re-inherits that course's stage.
+  // Moving the lesson to another course re-inherits that course's stage, and
+  // puts it after that course's last lesson.
   let derivedStage = lesson.stage;
+  let movedToOrder: number | null = null;
   if (input.courseId && String(input.courseId) !== String(lesson.courseId)) {
     const course = await Course.findById(input.courseId);
     if (!course) {
       throw ApiError.notFound("الكورس غير موجود", "COURSE_NOT_FOUND");
     }
     derivedStage = course.stage;
+    movedToOrder = await nextLessonOrder(course._id);
   }
 
-  // stage is always derived, never taken from the client payload directly.
+  // stage is always derived, never taken from the client payload directly; a
+  // field sent empty on purpose (an empty link) leaves the stored one alone.
   const { stage: _ignoredStage, ...rest } = input;
-  Object.assign(lesson, rest);
+  Object.assign(lesson, withoutUndefined(rest));
   lesson.stage = derivedStage;
+  if (movedToOrder !== null && input.order === undefined) lesson.order = movedToOrder;
+  // Back to following the video: take its real length now when it's known.
+  if (lesson.durationAuto && lesson.videoDurationSeconds > 0) {
+    lesson.durationMinutes = minutesOf(lesson.videoDurationSeconds);
+  }
   await lesson.save();
   return lesson;
 }
@@ -290,18 +350,61 @@ export interface SetLessonPublishedResult {
   lesson: LessonDocument;
   /** True only for a draft -> published transition, never for a re-publish. */
   publishedNow: boolean;
+  /** Not published yet: it will be, by itself, the moment its video is ready. */
+  scheduled: boolean;
 }
 
+/** How long "publish when ready" waits for a video that never gets ready. */
+const PUBLISH_WAIT_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Makes a draft public — for exactly one caller even when the teacher's click
+ * and the background check land together, so students are told only once.
+ * Null when it was already public.
+ */
+async function markPublished(lessonId: Types.ObjectId): Promise<LessonDocument | null> {
+  const lesson = await Lesson.findOneAndUpdate(
+    { _id: lessonId, isPublished: false },
+    { $set: { isPublished: true, publishWhenReady: null } },
+    { new: true },
+  );
+  // Record the FIRST publish moment only — used to compute "days since release"
+  // for the parent-notification workflow. Re-publishing after an unpublish does
+  // NOT reset it, so the "late" window stays anchored to when students could
+  // actually first see the lesson.
+  if (lesson && !lesson.publishedAt) {
+    lesson.publishedAt = new Date();
+    await Lesson.updateOne(
+      { _id: lessonId, publishedAt: null },
+      { $set: { publishedAt: lesson.publishedAt } },
+    );
+  }
+  return lesson;
+}
+
+/**
+ * Publishes or hides a lesson. Publishing needs a video students can play;
+ * with `whenReady`, a video still being prepared doesn't refuse it — the
+ * lesson is published by itself the moment the video is ready (see
+ * settleScheduledPublish). Hiding also cancels such a wait.
+ */
 export async function setLessonPublished(
   lessonId: string,
   isPublished: boolean,
+  { whenReady = false }: { whenReady?: boolean } = {},
 ): Promise<SetLessonPublishedResult> {
   const lesson = await Lesson.findById(lessonId);
   if (!lesson) throw ApiError.notFound("الدرس غير موجود", "LESSON_NOT_FOUND");
 
-  const publishedNow = isPublished && !lesson.isPublished;
+  if (!isPublished) {
+    lesson.isPublished = false;
+    lesson.publishWhenReady = null;
+    await lesson.save();
+    return { lesson, publishedNow: false, scheduled: false };
+  }
+  if (lesson.isPublished) return { lesson, publishedNow: false, scheduled: false };
 
-  if (isPublished && !lesson.bunnyVideoId) {
+  if (!lesson.bunnyVideoId) {
     throw ApiError.badRequest(
       "مش ممكن تنشر درس مفيش له فيديو",
       "NO_VIDEO_UPLOADED",
@@ -310,38 +413,103 @@ export async function setLessonPublished(
 
   // Students get the lesson the moment it's published — so not before its
   // video plays (until then they'd see a black screen).
-  if (publishedNow) {
-    const { status } = await syncLessonVideo(lesson, { force: true });
-    if (status === VIDEO_STATUS.FAILED) {
-      throw ApiError.conflict(
-        "الفيديو ده فيه مشكلة ومش هيشتغل للطلاب — ارفعه تاني من صفحة الدرس.",
-        "VIDEO_FAILED",
+  const { status } = await syncLessonVideo(lesson, { force: true });
+  if (status === VIDEO_STATUS.FAILED) {
+    throw ApiError.conflict(
+      "الفيديو ده فيه مشكلة ومش هيشتغل للطلاب — ارفعه تاني من صفحة الدرس.",
+      "VIDEO_FAILED",
+    );
+  }
+  if (status !== VIDEO_STATUS.READY) {
+    if (whenReady) {
+      lesson.publishWhenReady = new Date();
+      await Lesson.updateOne(
+        { _id: lesson._id, isPublished: false },
+        { $set: { publishWhenReady: lesson.publishWhenReady } },
       );
+      return { lesson, publishedNow: false, scheduled: true };
     }
-    if (status === VIDEO_STATUS.PROCESSING) {
-      throw ApiError.conflict(
-        "الفيديو لسه بيتجهز — هتقدر تنشر الدرس أول ما يخلص.",
-        "VIDEO_PROCESSING",
-      );
-    }
-    if (status !== VIDEO_STATUS.READY) {
-      throw ApiError.conflict(
-        "مقدرناش نتأكد إن الفيديو جاهز — حاول تاني كمان شوية.",
-        "VIDEO_UNCHECKED",
-      );
-    }
+    throw status === VIDEO_STATUS.PROCESSING
+      ? ApiError.conflict("الفيديو لسه بيتجهز — هتقدر تنشر الدرس أول ما يخلص.", "VIDEO_PROCESSING")
+      : ApiError.conflict("مقدرناش نتأكد إن الفيديو جاهز — حاول تاني كمان شوية.", "VIDEO_UNCHECKED");
   }
 
-  lesson.isPublished = isPublished;
-  // Record the FIRST publish moment only — used to compute "days since release"
-  // for the parent-notification workflow. Re-publishing after an unpublish does
-  // NOT reset it, so the "late" window stays anchored to when students could
-  // actually first see the lesson.
-  if (isPublished && !lesson.publishedAt) {
-    lesson.publishedAt = new Date();
+  const published = await markPublished(lesson._id);
+  return {
+    lesson: published ?? (await Lesson.findById(lesson._id)) ?? lesson,
+    publishedNow: !!published,
+    scheduled: false,
+  };
+}
+
+/**
+ * A lesson waiting for its video ("publish when ready"), given its video's
+ * state just now: published the moment the video is ready; the wait stops when
+ * the video broke or it ran out (the teacher publishes by hand then). True
+ * only for the call that published it — that one tells the students.
+ */
+export async function settleScheduledPublish(
+  lesson: LessonDocument,
+  status: VideoStatus | null,
+): Promise<boolean> {
+  if (!lesson.publishWhenReady || lesson.isPublished) return false;
+
+  if (status === VIDEO_STATUS.READY) {
+    const published = await markPublished(lesson._id);
+    if (!published) return false;
+    lesson.isPublished = true;
+    lesson.publishWhenReady = null;
+    lesson.publishedAt = published.publishedAt;
+    return true;
   }
-  await lesson.save();
-  return { lesson, publishedNow };
+
+  const waitedTooLong = Date.now() - lesson.publishWhenReady.getTime() > PUBLISH_WAIT_MS;
+  if (status === VIDEO_STATUS.FAILED || waitedTooLong) {
+    await Lesson.updateOne(
+      { _id: lesson._id, isPublished: false },
+      { $set: { publishWhenReady: null } },
+    );
+    lesson.publishWhenReady = null;
+  }
+  return false;
+}
+
+/** The lessons waiting to be published, oldest request first. */
+export function listLessonsWaitingToPublish(limit: number) {
+  return Lesson.find({ publishWhenReady: { $type: "date" }, isPublished: false })
+    .sort({ publishWhenReady: 1 })
+    .limit(limit);
+}
+
+/**
+ * Puts a course's lessons in the given order (what students see). The list
+ * must be exactly the course's lessons — so a stale page can't drop or
+ * duplicate one.
+ */
+export async function reorderCourseLessons(
+  courseId: string,
+  lessonIds: string[],
+): Promise<void> {
+  const course = await Course.exists({ _id: courseId });
+  if (!course) throw ApiError.notFound("الكورس غير موجود", "COURSE_NOT_FOUND");
+
+  const current = await Lesson.find({ courseId }).select("_id").lean();
+  const ids = new Set(current.map((l) => String(l._id)));
+  if (lessonIds.length !== ids.size || lessonIds.some((id) => !ids.has(id))) {
+    throw ApiError.conflict(
+      "دروس الكورس اتغيّرت من صفحة تانية — حدّث الصفحة وجرّب تاني.",
+      "LESSONS_CHANGED",
+    );
+  }
+
+  await Lesson.bulkWrite(
+    lessonIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: new Types.ObjectId(id), courseId: course._id },
+        update: { $set: { order: index + 1 } },
+      },
+    })),
+  );
 }
 
 /**
@@ -381,6 +549,7 @@ export async function applyBulkLessonAction(
   const processedIds: string[] = [];
   const failedIds: string[] = [];
   const publishedNowIds: string[] = [];
+  const scheduledIds: string[] = [];
 
   const batchSize = 5;
   for (let start = 0; start < idsToProcess.length; start += batchSize) {
@@ -389,13 +558,10 @@ export async function applyBulkLessonAction(
       batch.map(async (lessonId) => {
         if (action === "delete") {
           await deleteLesson(lessonId);
-          return false;
+          return { publishedNow: false, scheduled: false };
         }
-        const { publishedNow } = await setLessonPublished(
-          lessonId,
-          action === "publish",
-        );
-        return publishedNow;
+        // A lesson whose video is still being prepared gets published once it's ready.
+        return setLessonPublished(lessonId, action === "publish", { whenReady: true });
       }),
     );
     settled.forEach((result, index) => {
@@ -404,11 +570,12 @@ export async function applyBulkLessonAction(
         return;
       }
       processedIds.push(batch[index]);
-      if (result.value) publishedNowIds.push(batch[index]);
+      if (result.value.publishedNow) publishedNowIds.push(batch[index]);
+      if (result.value.scheduled) scheduledIds.push(batch[index]);
     });
   }
 
-  return { processedIds, missingIds, failedIds, publishedNowIds };
+  return { processedIds, missingIds, failedIds, publishedNowIds, scheduledIds };
 }
 
 export async function setLessonThumbnailFromUpload(

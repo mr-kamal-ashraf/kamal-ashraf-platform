@@ -142,6 +142,7 @@ export type PaymentStatus =
 export const PAYMENT_METHOD = {
   CARD: "card",     // Visa / Mastercard / Meeza in Paymob's iframe
   WALLET: "wallet", // Vodafone Cash & other mobile wallets
+  KIOSK: "kiosk",   // cash at an Aman / Masary outlet, with a reference number
 } as const;
 
 export type PaymentMethod =

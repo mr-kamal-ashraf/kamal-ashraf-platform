@@ -134,8 +134,7 @@ export function PaymentCallbackView() {
       <SiteHeader />
       <main className="relative flex flex-1 items-center justify-center px-4 py-16">
         <PageBackdrop />
-        <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-elegant">
-          <span className="absolute inset-x-0 top-0 h-1.5 bg-gradient-brand" />
+        <div className="card-strata relative w-full max-w-md overflow-hidden rounded-3xl p-8 text-center">
           <div className="relative mx-auto flex size-20 items-center justify-center rounded-full bg-primary/8 text-5xl">
             <span className="absolute inset-0 animate-ripple rounded-full border-2 border-primary/30" />
             {content.emoji}

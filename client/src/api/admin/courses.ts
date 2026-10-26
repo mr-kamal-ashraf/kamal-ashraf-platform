@@ -11,9 +11,11 @@ export interface CourseAdminFilters {
 
 export interface CourseCreatePayload {
   title: string;
-  slug: string;
+  /** Left out: made from the title. */
+  slug?: string;
   description: string;
-  longDescription: string;
+  /** Empty: the course page shows the short description. */
+  longDescription?: string;
   stage: Stage;
   price: number;
   thumbnail?: string | null;

@@ -8,6 +8,7 @@ import {
   getActiveEnrollment,
 } from "../enrollments/enrollment.service";
 import { reconcilePendingForCourse } from "../payments/payment.service";
+import { getPendingKioskPayment, type KioskReference } from "../payments/kiosk";
 import { recordAuditLog } from "../audit-logs/audit-log.service";
 import { AUDIT_ACTIONS } from "../audit-logs/audit-log.model";
 import type {
@@ -115,12 +116,15 @@ export async function getForStudent(req: Request, res: Response) {
   }
 
   let owned = false;
+  let pendingKiosk: KioskReference | null = null;
   if (req.user) {
     const enrollment = await getActiveEnrollment(req.user.id, course._id);
     owned = !!enrollment;
     // Safety net: a payment still pending here may have been paid with no
     // webhook yet — ask Paymob, and open the course if so.
     if (!owned) owned = await reconcilePendingForCourse(req.user.id, course._id);
+    // A cash reference the student hasn't paid yet stays visible here.
+    if (!owned) pendingKiosk = await getPendingKioskPayment(req.user.id, course);
   }
 
   const lessons = await courseService.listPublishedLessonsForCourse(course._id);
@@ -140,6 +144,7 @@ export async function getForStudent(req: Request, res: Response) {
       },
       owned,
       canBuy: !owned,
+      pendingKiosk,
       lessons: lessons.map((l) =>
         courseLessonDto(l.toJSON() as Record<string, unknown>, owned),
       ),

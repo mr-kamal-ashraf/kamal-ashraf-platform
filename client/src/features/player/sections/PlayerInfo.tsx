@@ -25,7 +25,7 @@ export function PlayerInfo() {
           {lesson.title}
         </h1>
         <p className="mt-3 max-w-3xl leading-relaxed text-muted-foreground">
-          {lesson.longDescription}
+          {lesson.longDescription || lesson.description}
         </p>
       </div>
 

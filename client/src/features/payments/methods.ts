@@ -15,6 +15,11 @@ export const PAYMENT_METHODS: Record<
     hint: "فودافون كاش · اتصالات كاش · أورنج كاش · WE Pay",
     icon: "📱",
   },
+  kiosk: {
+    title: "كاش في أي محل",
+    hint: "أمان أو مصاري — بتاخد رقم وتدفع بيه في أقرب محل",
+    icon: "🏪",
+  },
 };
 
 /** An Egyptian mobile number (what a wallet is registered on). */

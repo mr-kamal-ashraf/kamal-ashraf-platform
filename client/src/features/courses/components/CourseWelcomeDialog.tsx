@@ -97,7 +97,7 @@ export function CourseWelcomeDialog({
             role="dialog"
             aria-modal="true"
             aria-labelledby="welcome-title"
-            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-7 text-center shadow-elegant outline-none sm:p-8"
+            className="card-strata relative w-full max-w-md overflow-hidden rounded-3xl p-7 text-center outline-none sm:p-8"
             initial={
               reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 16 }
             }

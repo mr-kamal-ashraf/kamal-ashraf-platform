@@ -241,7 +241,79 @@ async function request<T>(
   return (payload?.data as T) ?? (null as unknown as T);
 }
 
+export interface UploadOptions {
+  /** Bytes sent so far, out of the whole body. */
+  onProgress?: (sent: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
+/** One send over XHR — fetch can't tell how much of a big file went out. */
+function sendWithProgress(
+  url: string,
+  body: FormData,
+  { onProgress, signal }: UploadOptions,
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(e.loaded, e.total);
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () =>
+      reject(
+        createApiError(
+          "تعذّر الاتصال بالسيرفر — راجع الإنترنت وحاول تاني.",
+          0,
+          "NETWORK_ERROR",
+        ),
+      );
+    xhr.onabort = () => reject(createApiError("تم إلغاء الطلب.", 0, "REQUEST_ABORTED"));
+    if (signal?.aborted) return reject(createApiError("تم إلغاء الطلب.", 0, "REQUEST_ABORTED"));
+    signal?.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(body);
+  });
+}
+
+/**
+ * A file upload that reports its progress (a lesson video can take minutes).
+ * A small signed-in request goes first — it renews the session only if it ran
+ * out while the page sat idle — so a big file is never sent twice.
+ */
+async function upload<T>(
+  endpoint: string,
+  body: FormData,
+  options: UploadOptions = {},
+): Promise<T> {
+  const isAdminPath = isAdminEndpoint(endpoint);
+  await request(isAdminPath ? "/admin/auth/me" : "/auth/me", { signal: options.signal });
+  const url = `${API_URL}${endpoint}`;
+  let response = await sendWithProgress(url, body, options);
+  if (response.status === 401 && (await tryRefresh(isAdminPath).catch(() => false))) {
+    response = await sendWithProgress(url, body, options);
+  }
+
+  let payload: ApiResponse<T> | null = null;
+  try {
+    payload = JSON.parse(response.text) as ApiResponse<T>;
+  } catch {
+    // Non-JSON response — treat as error
+  }
+  if (response.status < 200 || response.status >= 300) {
+    throw createApiError(
+      payload?.message || genericFallbackMessage(response.status),
+      response.status,
+      payload?.code,
+      payload?.details,
+    );
+  }
+  return (payload?.data as T) ?? (null as unknown as T);
+}
+
 export const apiClient = {
+  upload,
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "GET" }),
   post: <T>(endpoint: string, body?: unknown, options?: RequestOptions) =>

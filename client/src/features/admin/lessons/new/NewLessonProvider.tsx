@@ -13,338 +13,278 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { adminLessonsApi, adminCoursesApi, isApiError } from "@/api";
-import type { CourseAdminItem } from "@/api/types";
+import { adminCoursesApi, adminLessonsApi, isApiError } from "@/api";
+import type { CourseAdminItem, Lesson, LessonVideoStatus } from "@/api/types";
 import {
-  SLUG_TAKEN_MESSAGE,
-  contentRules,
   focusFirstInvalid,
   hasErrors,
   serverFieldErrors,
   useLiveRecheck,
   type FieldErrors,
-} from "@/features/admin/shared/wizardValidation";
+} from "@/features/admin/shared/formValidation";
+import {
+  useUploadProgress,
+  type UploadProgress,
+} from "@/features/admin/shared/upload/useUploadProgress";
+import {
+  EMPTY_LESSON,
+  checkLessonField,
+  lessonPayload,
+  validateLesson,
+  type LessonFormValues,
+} from "../components/LessonFields";
+import { useVideoFileSeconds } from "../components/LessonVideoPicker";
+import { useVideoWatch, withVideoStatus } from "../videoReadiness";
 
-export interface NewLessonForm {
-  courseId: string;
-  title: string;
-  slug: string;
-  description: string;
-  longDescription: string;
-  durationMinutes: number;
-  chapters: number;
-  topics: string[];
-}
+/** After the upload: publish by itself once the video is ready, or keep it hidden. */
+export type PublishChoice = "whenReady" | "draft";
 
-type UploadStep = "form" | "uploading" | "done";
-
-/** Ordered wizard steps for the create-lesson flow. */
-const WIZARD_STEPS = [
-  { title: "الكورس والعنوان" },
-  { title: "وصف الدرس" },
-  { title: "الفيديو" },
-  { title: "الصورة" },
-] as const;
-
-const TOTAL_STEPS = WIZARD_STEPS.length;
+type Phase = "form" | "saving" | "done";
 
 interface NewLessonContextValue {
-  form: NewLessonForm;
-  courses: CourseAdminItem[];
-  thumbnailFile: File | null;
+  courses: CourseAdminItem[] | null;
+  courseId: string;
+  /** The course came with the link (from its page): shown, not asked. */
+  courseFromLink: boolean;
+  setCourseId: (id: string) => void;
+  values: LessonFormValues;
+  change: (patch: Partial<LessonFormValues>) => void;
   videoFile: File | null;
-  step: UploadStep;
-  statusMessage: string;
-  submitting: boolean;
-  wizardStep: number;
-  steps: readonly { title: string }[];
-  isLastStep: boolean;
-  /** This step's problems, shown under their fields after "التالي". */
+  setVideoFile: (file: File | null) => void;
+  /** The picked video's length, read on this device. */
+  videoSeconds: number | null;
+  imageFile: File | null;
+  setImageFile: (file: File | null) => void;
+  publishChoice: PublishChoice;
+  setPublishChoice: (choice: PublishChoice) => void;
   errors: FieldErrors;
-  /** Asking the server whether the link is free. */
-  checking: boolean;
+  phase: Phase;
+  upload: UploadProgress | null;
+  /** The lesson just saved (the "done" screen), kept up to date. */
+  saved: Lesson | null;
+  videoProgress: number | null;
   formRef: RefObject<HTMLFormElement | null>;
-  setForm: (updater: (prev: NewLessonForm) => NewLessonForm) => void;
-  setThumbnailFile: (f: File | null) => void;
-  setVideoFile: (f: File | null) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  next: () => Promise<void>;
-  prev: () => void;
+  submit: (e: React.FormEvent) => void;
+  cancelUpload: () => void;
+  /** Same course, fresh form — for the next lesson. */
+  startNext: () => void;
 }
 
-const NewLessonContext = createContext<NewLessonContextValue | undefined>(
-  undefined,
-);
-
-const initialForm: NewLessonForm = {
-  courseId: "",
-  title: "",
-  slug: "",
-  description: "",
-  longDescription: "",
-  durationMinutes: 30,
-  chapters: 1,
-  topics: [],
-};
-
-/** What each step checks: the form's fields, plus the video file. */
-type CheckedField = keyof NewLessonForm | "video";
-
-const STEP_FIELDS: CheckedField[][] = [
-  ["courseId", "title", "slug"],
-  ["description", "longDescription", "durationMinutes", "chapters", "topics"],
-  ["video"],
-  [],
-];
-
-/** The server's rules for one field (lesson.validation.ts). */
-function checkField(
-  field: CheckedField,
-  form: NewLessonForm,
-  videoFile: File | null,
-): string | null {
-  switch (field) {
-    case "courseId":
-      return form.courseId ? null : "اختار الكورس اللي الدرس هيتضاف ليه.";
-    case "title":
-      return contentRules.title(form.title, "الدرس");
-    case "slug":
-      return contentRules.slug(form.slug);
-    case "description":
-      return contentRules.description(form.description);
-    case "longDescription":
-      return contentRules.longDescription(form.longDescription);
-    case "durationMinutes":
-      return contentRules.durationMinutes(form.durationMinutes);
-    case "chapters":
-      return contentRules.chapters(form.chapters);
-    case "topics":
-      return contentRules.topics(form.topics);
-    case "video":
-      return videoFile ? null : "اختار ملف الفيديو عشان تكمّل.";
-  }
-}
-
-function validateStep(step: number, form: NewLessonForm, videoFile: File | null): FieldErrors {
-  const errors: FieldErrors = {};
-  for (const field of STEP_FIELDS[step] ?? []) {
-    const message = checkField(field, form, videoFile);
-    if (message) errors[field] = message;
-  }
-  return errors;
-}
-
-/** The step a field lives on — where a server error sends the teacher back to. */
-const stepOf = (field: string) =>
-  STEP_FIELDS.findIndex((fields) => (fields as string[]).includes(field));
+const NewLessonContext = createContext<NewLessonContextValue | undefined>(undefined);
 
 export function NewLessonProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [form, setForm] = useState<NewLessonForm>(initialForm);
-  const [courses, setCourses] = useState<CourseAdminItem[]>([]);
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [courses, setCourses] = useState<CourseAdminItem[] | null>(null);
+  const [courseId, setCourseIdState] = useState("");
+  const [courseFromLink, setCourseFromLink] = useState(false);
+  const [values, setValues] = useState<LessonFormValues>(EMPTY_LESSON);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState<UploadStep>("form");
-  const [statusMessage, setStatusMessage] = useState<string>("");
-  const [wizardStep, setWizardStep] = useState(0);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [publishChoice, setPublishChoice] = useState<PublishChoice>("whenReady");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [checking, setChecking] = useState(false);
+  const [phase, setPhase] = useState<Phase>("form");
+  const [saved, setSaved] = useState<Lesson | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const { progress: upload, start, onProgress, reset } = useUploadProgress();
+  const videoSeconds = useVideoFileSeconds(videoFile);
 
-  const checked = useMemo(() => ({ ...form, video: videoFile }), [form, videoFile]);
-  useLiveRecheck(checked, setErrors, (field) => checkField(field, form, videoFile));
+  const checked = useMemo(
+    () => ({ ...values, courseId, video: videoFile }),
+    [values, courseId, videoFile],
+  );
+  useLiveRecheck(checked, setErrors, (field) => {
+    if (field === "courseId") return courseId ? null : "اختار الكورس اللي الدرس هيتضاف ليه.";
+    if (field === "video") return videoFile ? null : "اختار فيديو الدرس.";
+    return checkLessonField(field, values);
+  });
 
-  // Load the course list and preselect the ?courseId= from the URL (set when
-  // the admin clicked "درس جديد" from inside a course), else the first course.
+  // The course from the link (the course page's "+ درس جديد"); otherwise the
+  // teacher picks one — preselected only when there's just one.
   useEffect(() => {
     (async () => {
       try {
-        const result = await adminCoursesApi.list({ limit: 100 });
-        setCourses(result.items);
-        const params = new URLSearchParams(window.location.search);
-        const fromUrl = params.get("courseId") || "";
-        const valid = result.items.some((c) => c._id === fromUrl);
-        const preselect = valid ? fromUrl : result.items[0]?._id || "";
-        setForm((p) => ({ ...p, courseId: preselect }));
+        const { items } = await adminCoursesApi.list({ limit: 100 });
+        setCourses(items);
+        const fromLink = new URLSearchParams(window.location.search).get("courseId") ?? "";
+        if (items.some((c) => c._id === fromLink)) {
+          setCourseIdState(fromLink);
+          setCourseFromLink(true);
+        } else if (items.length === 1) {
+          setCourseIdState(items[0]._id);
+        }
       } catch (err) {
-        toast.error(isApiError(err) ? err.message : "فشل تحميل الكورسات");
+        setCourses([]);
+        toast.error(isApiError(err) ? err.message : "مقدرناش نجيب الكورسات");
       }
     })();
   }, []);
 
-  /** Moves on only when this step is right — including a link no other lesson uses. */
-  const next = useCallback(async () => {
-    if (checking) return;
-    const found = validateStep(wizardStep, form, videoFile);
-    if (wizardStep === 0 && !found.slug) {
-      setChecking(true);
-      try {
-        const { available } = await adminLessonsApi.slugAvailable(form.slug.trim());
-        if (!available) found.slug = SLUG_TAKEN_MESSAGE;
-      } catch {
-        // Couldn't ask right now — saving checks it again anyway.
-      } finally {
-        setChecking(false);
-      }
-    }
+  const change = useCallback(
+    (patch: Partial<LessonFormValues>) => setValues((v) => ({ ...v, ...patch })),
+    [],
+  );
+  const setCourseId = useCallback((id: string) => setCourseIdState(id), []);
+
+  const onSavedVideo = useCallback(
+    (_id: string, video: LessonVideoStatus) =>
+      setSaved((s) => (s ? withVideoStatus(s, video) : s)),
+    [],
+  );
+  const watchProgress = useVideoWatch(saved ? [saved] : [], onSavedVideo);
+
+  const save = useCallback(async () => {
+    const found = validateLesson(values);
+    if (!courseId) found.courseId = "اختار الكورس اللي الدرس هيتضاف ليه.";
+    if (!videoFile) found.video = "اختار فيديو الدرس.";
     if (hasErrors(found)) {
       setErrors(found);
       toast.error("فيه خانات محتاجة تتصلّح — بصّ على اللي باللون الأحمر.");
       focusFirstInvalid(formRef.current);
       return;
     }
-    setErrors({});
-    setWizardStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  }, [checking, wizardStep, form, videoFile]);
+    if (!videoFile) return;
 
-  const prev = useCallback(() => {
-    if (wizardStep === 0) {
-      router.back();
-      return;
-    }
-    setWizardStep((s) => Math.max(s - 1, 0));
-  }, [wizardStep, router]);
-
-  const submitFinal = useCallback(async () => {
-    if (submitting) return;
-    if (!form.courseId) {
-      toast.error("لازم تختار الكورس اللي الدرس هيتضاف ليه");
-      return;
-    }
-    if (!videoFile) {
-      toast.error("لازم تختار ملف فيديو قبل حفظ الدرس");
-      return;
-    }
-    setSubmitting(true);
+    setPhase("saving");
+    start();
+    let lesson: Lesson;
     try {
-      setStep("uploading");
-      setStatusMessage("جارٍ إنشاء الدرس...");
-
-      const result = await adminLessonsApi.create({
-        courseId: form.courseId,
-        title: form.title.trim(),
-        slug: form.slug.trim(),
-        description: form.description.trim(),
-        longDescription: form.longDescription.trim(),
-        durationMinutes: form.durationMinutes,
-        chapters: form.chapters,
-        topics: form.topics.map((t) => t.trim()).filter(Boolean),
-      });
-
-      const lessonId = String(result.lesson._id ?? "");
-      if (!lessonId) {
-        throw new Error("MISSING_LESSON_ID");
-      }
-
-      if (thumbnailFile) {
-        setStatusMessage("جارٍ رفع صورة الدرس...");
-        try {
-          await adminLessonsApi.uploadThumbnail(lessonId, thumbnailFile);
-        } catch (err) {
-          toast.warning(
-            isApiError(err)
-              ? `تم إنشاء الدرس لكن فشل رفع الصورة: ${err.message}`
-              : "تم إنشاء الدرس. ارفع الصورة لاحقاً من صفحة التعديل.",
-          );
-        }
-      }
-
-      setStatusMessage("جارٍ رفع الفيديو");
-      try {
-        await adminLessonsApi.uploadVideo(lessonId, videoFile);
-      } catch (err) {
-        setStep("form");
-        toast.error(
-          isApiError(err)
-            ? `تم إنشاء الدرس لكن فشل رفع الفيديو: ${err.message}. هنوجّهك لصفحة التعديل عشان ترفعه من هناك.`
-            : "تم إنشاء الدرس لكن فشل رفع الفيديو. هنوجّهك لصفحة التعديل عشان ترفعه من هناك.",
-        );
-        router.push(`/admin/lessons/${lessonId}`);
-        return;
-      }
-
-      setStep("done");
-      toast.success("تم إنشاء الدرس بنجاح");
-      router.push(`/admin/courses/${form.courseId}`);
+      ({ lesson } = await adminLessonsApi.create({
+        courseId,
+        ...lessonPayload(values, videoSeconds),
+      }));
     } catch (err) {
-      setStep("form");
-      // Something only the server knows (e.g. the link got taken meanwhile):
-      // back to that field's step, with the message under it.
+      setPhase("form");
+      reset();
       const fieldErrors = serverFieldErrors(err);
       if (fieldErrors) {
-        const back = Math.min(
-          ...Object.keys(fieldErrors).map((f) => (stepOf(f) >= 0 ? stepOf(f) : TOTAL_STEPS - 1)),
-        );
         setErrors(fieldErrors);
-        setWizardStep(back);
-        toast.error("فيه خانة محتاجة تتصلّح — رجّعناك للخطوة بتاعتها.");
-        focusFirstInvalid(formRef.current, 320);
-      } else {
-        toast.error(isApiError(err) ? err.message : "حصل خطأ غير متوقع");
+        focusFirstInvalid(formRef.current, 50);
       }
-    } finally {
-      setSubmitting(false);
+      toast.error(isApiError(err) ? err.message : "حصل خطأ غير متوقع");
+      return;
     }
-  }, [form, thumbnailFile, videoFile, submitting, router]);
 
-  const isLastStep = wizardStep === TOTAL_STEPS - 1;
+    if (imageFile) {
+      try {
+        ({ lesson } = await adminLessonsApi.uploadThumbnail(lesson._id, imageFile));
+      } catch (err) {
+        toast.warning(
+          `الدرس اتحفظ، بس الصورة ماترفعتش${isApiError(err) ? `: ${err.message}` : ""} — ارفعها من صفحة الدرس.`,
+        );
+      }
+    }
 
-  const onSubmit = useCallback(
+    const abort = new AbortController();
+    abortRef.current = abort;
+    try {
+      ({ lesson } = await adminLessonsApi.uploadVideo(lesson._id, videoFile, {
+        onProgress,
+        signal: abort.signal,
+      }));
+    } catch (err) {
+      // The lesson exists without its video: its page has the upload box.
+      const cancelled = isApiError(err) && err.code === "REQUEST_ABORTED";
+      toast[cancelled ? "info" : "error"](
+        cancelled
+          ? "وقّفنا رفع الفيديو. الدرس اتحفظ من غير فيديو — ارفعه من هنا وقت ما تحب."
+          : `الدرس اتحفظ بس الفيديو ماترفعش${isApiError(err) ? `: ${err.message}` : ""} — جرّب ترفعه تاني من هنا.`,
+      );
+      router.push(`/admin/lessons/${lesson._id}`);
+      return;
+    } finally {
+      abortRef.current = null;
+    }
+
+    if (publishChoice === "whenReady") {
+      try {
+        ({ lesson } = await adminLessonsApi.togglePublish(lesson._id, true, { whenReady: true }));
+      } catch (err) {
+        toast.warning(
+          `الدرس اترفع، بس مقدرناش نظبط النشر${isApiError(err) ? `: ${err.message}` : ""} — انشره من صفحة الكورس.`,
+        );
+      }
+    }
+
+    setSaved(lesson);
+    setPhase("done");
+    reset();
+    window.scrollTo({ top: 0 });
+  }, [values, courseId, videoFile, videoSeconds, imageFile, publishChoice, start, onProgress, reset, router]);
+
+  const submit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (submitting) return;
-      if (isLastStep) void submitFinal();
-      else void next();
+      if (phase === "form") void save();
     },
-    [submitting, isLastStep, submitFinal, next],
+    [phase, save],
   );
+
+  const cancelUpload = useCallback(() => abortRef.current?.abort(), []);
+
+  const startNext = useCallback(() => {
+    setValues(EMPTY_LESSON);
+    setVideoFile(null);
+    setImageFile(null);
+    setErrors({});
+    setSaved(null);
+    setPhase("form");
+    window.scrollTo({ top: 0 });
+    // The course's lesson count moved on (where the next one goes).
+    adminCoursesApi
+      .list({ limit: 100 })
+      .then(({ items }) => setCourses(items))
+      .catch(() => undefined);
+  }, []);
 
   const value = useMemo<NewLessonContextValue>(
     () => ({
-      form,
       courses,
-      thumbnailFile,
+      courseId,
+      courseFromLink,
+      setCourseId,
+      values,
+      change,
       videoFile,
-      step,
-      statusMessage,
-      submitting,
-      wizardStep,
-      steps: WIZARD_STEPS,
-      isLastStep,
-      errors,
-      checking,
-      formRef,
-      setForm,
-      setThumbnailFile,
       setVideoFile,
-      onSubmit,
-      next,
-      prev,
+      videoSeconds,
+      imageFile,
+      setImageFile,
+      publishChoice,
+      setPublishChoice,
+      errors,
+      phase,
+      upload,
+      saved,
+      videoProgress: saved ? (watchProgress[saved._id] ?? null) : null,
+      formRef,
+      submit,
+      cancelUpload,
+      startNext,
     }),
     [
-      form,
       courses,
-      thumbnailFile,
+      courseId,
+      courseFromLink,
+      setCourseId,
+      values,
+      change,
       videoFile,
-      step,
-      statusMessage,
-      submitting,
-      wizardStep,
-      isLastStep,
+      videoSeconds,
+      imageFile,
+      publishChoice,
       errors,
-      checking,
-      onSubmit,
-      next,
-      prev,
+      phase,
+      upload,
+      saved,
+      watchProgress,
+      submit,
+      cancelUpload,
+      startNext,
     ],
   );
 
-  return (
-    <NewLessonContext.Provider value={value}>
-      {children}
-    </NewLessonContext.Provider>
-  );
+  return <NewLessonContext.Provider value={value}>{children}</NewLessonContext.Provider>;
 }
 
 export function useNewLesson() {

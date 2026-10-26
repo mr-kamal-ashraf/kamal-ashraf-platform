@@ -22,7 +22,8 @@ export function resolveAssetUrl(
   path: string | null | undefined,
 ): string | null {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path;
+  // Full URLs, and a picture picked on this device (a preview before upload).
+  if (/^(https?:\/\/|blob:)/i.test(path)) return path;
   if (path.startsWith("/")) return `${API_ORIGIN}${path}`;
   return `${API_ORIGIN}/${path}`;
 }

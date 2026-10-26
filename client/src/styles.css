@@ -703,6 +703,63 @@ html:has([data-admin-root]) {
       translate: none;
     }
   }
+
+  /* ═══ BOXES — «لوح على طبقات» ═════════════════════════════════════════════
+     The buttons' idea, for boxes: a slab of the card colour resting on two
+     strata that peek out underneath, each a little narrower — a rock layer
+     tinted by the palette, then the highlight's sediment. It replaces the
+     coloured stripe along a box's top (a stock "generated" look). Colours
+     follow the palette and dark mode. .card-strata-hover lifts a clickable
+     card off its strata. Don't add shadow-* utilities next to it: they'd
+     replace the strata. */
+  .card-strata {
+    --strata-rock: color-mix(in oklch, var(--primary) 18%, var(--border));
+    --strata-sediment: color-mix(in oklch, var(--highlight) 42%, var(--border));
+    --strata-shine: color-mix(in oklch, white 60%, transparent);
+    --strata-glow: color-mix(in oklch, var(--primary) 45%, transparent);
+    --strata-lift: 0px;
+    border: 1px solid color-mix(in oklch, var(--primary) 12%, var(--border));
+    border-radius: 1.5rem;
+    background-color: var(--card);
+    box-shadow:
+      inset 0 1px 0 var(--strata-shine),
+      0 calc(5px + var(--strata-lift)) 0 -1px var(--strata-rock),
+      0 calc(9px + var(--strata-lift) * 1.5) 0 -3px var(--strata-sediment),
+      0 calc(24px + var(--strata-lift) * 3) 32px -26px var(--strata-glow);
+    transition:
+      translate 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms ease;
+  }
+
+  .dark .card-strata {
+    --strata-rock: color-mix(in oklch, var(--primary) 32%, var(--border));
+    --strata-sediment: color-mix(in oklch, var(--highlight-deep) 55%, var(--border));
+    --strata-shine: color-mix(in oklch, white 7%, transparent);
+    --strata-glow: color-mix(in oklch, black 70%, transparent);
+  }
+
+  /* A box asking to confirm something destructive. */
+  .card-strata.card-strata-danger {
+    --strata-rock: color-mix(in oklch, var(--destructive) 32%, var(--border));
+    --strata-sediment: color-mix(in oklch, var(--destructive) 16%, var(--border));
+  }
+
+  @media (hover: hover) {
+    .card-strata-hover:hover {
+      --strata-lift: 2px;
+      translate: 0 -2px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-strata {
+      transition: none;
+    }
+    .card-strata-hover:hover {
+      translate: none;
+    }
+  }
 }
 
 @layer utilities {
@@ -1468,6 +1525,26 @@ html:has([data-admin-root])::-webkit-scrollbar-thumb:hover,
   border-radius: inherit;
   background: var(--gradient-brand);
   animation: brand-loader-slide 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+/* A real upload's progress (UploadProgressScreen): fills from the right, the
+   way the page reads — scaleX, so it never re-lays out the page. */
+.brand-loader__meter {
+  position: relative;
+  width: min(70%, 20rem);
+  height: 8px;
+  margin-block: 0.5rem 0.25rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+}
+.brand-loader__meter > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  transform-origin: right;
+  transform: scaleX(var(--progress, 0));
+  transition: transform 0.35s ease-out;
 }
 @keyframes brand-loader-in {
   to {

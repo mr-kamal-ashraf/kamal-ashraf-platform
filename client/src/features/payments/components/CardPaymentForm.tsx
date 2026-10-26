@@ -21,6 +21,30 @@ export interface CardCheckout {
 const PAY_TIMEOUT_MS = 90_000;
 
 /**
+ * Counts changes of light/dark mode or palette. Paymob's fields take their
+ * colours once, when they're made (there's no way to restyle them), so they
+ * are made again in the new colours — otherwise switching to light mode left
+ * a black box of dark-mode fields in a light page.
+ */
+function useThemeVersion() {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const root = document.documentElement;
+    const look = () => `${root.classList.contains("dark")}|${root.dataset.palette ?? ""}`;
+    let last = look();
+    const observer = new MutationObserver(() => {
+      const now = look();
+      if (now === last) return;
+      last = now;
+      setVersion((n) => n + 1);
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class", "data-palette"] });
+    return () => observer.disconnect();
+  }, []);
+  return version;
+}
+
+/**
  * Card payment inside our checkout: Paymob's card fields (Pixel) dressed in
  * the platform's style, paid with our own button. Cards that need the bank's
  * 3-D Secure check go to the bank's page and come back to the result page;
@@ -43,7 +67,12 @@ export function CardPaymentForm({
     "loading",
   );
   const [attempt, setAttempt] = useState(0);
-  const [valid, setValid] = useState(false);
+  const themeVersion = useThemeVersion();
+  // Which set of fields this is: a retry or a theme change makes new, empty
+  // ones — "valid" only ever counts for the set that reported it.
+  const fieldsKey = `${attempt}:${themeVersion}`;
+  const [validFor, setValidFor] = useState<string | null>(null);
+  const valid = validFor === fieldsKey;
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<{ text: string; restart: boolean } | null>(
     null,
@@ -86,7 +115,7 @@ export function CardPaymentForm({
           // Paymob's "Powered by" footer only adds space under the fields.
           showPaymobLogo: false,
           cardValidationChanged: (isValid) => {
-            setValid(isValid);
+            setValidFor(isValid ? fieldsKey : null);
             if (isValid) setError((e) => (e?.restart ? e : null));
           },
           afterPaymentComplete: onResult,
@@ -101,7 +130,8 @@ export function CardPaymentForm({
       window.clearTimeout(timeout.current);
       unmount?.();
     };
-  }, [checkout, attempt, router]);
+    // fieldsKey: a retry, or new colours (see useThemeVersion), makes new fields.
+  }, [checkout, fieldsKey, router]);
 
   function pay() {
     if (!valid || paying) return;

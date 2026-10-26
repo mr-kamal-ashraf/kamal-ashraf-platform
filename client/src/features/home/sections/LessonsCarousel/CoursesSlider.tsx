@@ -34,11 +34,11 @@ export function CoursesSlider({
         1536: { slidesPerView: 3.4, spaceBetween: 30 },
         1920: { slidesPerView: 4, spaceBetween: 32 },
       }}
-      className="px-6! sm:px-10! lg:px-12!"
+      className="px-6! pb-4! sm:px-10! lg:px-12!"
     >
-      {courses.map((course, idx) => (
+      {courses.map((course) => (
         <SwiperSlide key={course._id} className="h-auto">
-          <CourseCardBig course={course} index={idx} />
+          <CourseCardBig course={course} />
         </SwiperSlide>
       ))}
     </Swiper>

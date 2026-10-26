@@ -17,6 +17,7 @@ import { isOptimizable } from "@/shared/lib/images";
 import { BioIcon, CoverArt, PageBackdrop } from "@/shared/components/bio";
 import { BtnNucleus } from "@/shared/ui/Button";
 import { RedeemCodeForm } from "./components/RedeemCodeForm";
+import { KioskReferenceCard } from "@/features/payments/components/KioskReferenceCard";
 import { useSiteSettings } from "@/shared/site-settings";
 import { WELCOME_PARAM } from "./welcome";
 import { LoadingScreen } from "@/shared/ui/LoadingScreen";
@@ -258,6 +259,14 @@ export function CourseDetailView({
                     </div>
                     {renderBuyArea()}
                   </div>
+                  {/* A cash reference they took and haven't paid yet. */}
+                  {personal && !data.owned && data.pendingKiosk && (
+                    <KioskReferenceCard
+                      reference={data.pendingKiosk}
+                      variant="compact"
+                      courseSlug={data.course.slug}
+                    />
+                  )}
                   {/* Prepaid code: only when the student could actually use one here. */}
                   {personal &&
                     !data.owned &&
@@ -279,7 +288,7 @@ export function CourseDetailView({
                     {data.course.title}
                   </h1>
                   <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                    {data.course.longDescription}
+                    {data.course.longDescription || data.course.description}
                   </p>
                 </div>
               </div>

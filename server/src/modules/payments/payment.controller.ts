@@ -11,8 +11,9 @@ import type { CheckoutInput, VerifyPaymentInput } from "./payment.validation";
 /**
  * POST /payments/courses/:courseId/checkout { method?, walletPhone? }
  * Starts a Paymob checkout for the logged-in student: the card fields to embed
- * (card, Pixel) or an iframe URL (card, classic), or a wallet confirmation
- * page (wallet) — or { free:true } for a free course.
+ * (card, Pixel) or an iframe URL (card, classic), a wallet confirmation page
+ * (wallet), or a reference to pay in cash at Aman / Masary (kiosk) — or
+ * { free:true } for a free course.
  */
 export async function checkout(req: Request, res: Response) {
   if (!req.user) throw ApiError.unauthorized();
@@ -30,7 +31,11 @@ export async function checkout(req: Request, res: Response) {
   });
 
   return sendSuccess(res, {
-    message: result.free ? "تم فتح الكورس" : "تم تجهيز صفحة الدفع",
+    message: result.free
+      ? "تم فتح الكورس"
+      : result.kiosk
+        ? "رقم الدفع جاهز"
+        : "تم تجهيز صفحة الدفع",
     data: result,
   });
 }
@@ -51,7 +56,7 @@ export async function verify(req: Request, res: Response) {
   return sendSuccess(res, { data: result });
 }
 
-/** GET /payments/methods — which of card / wallet are configured. */
+/** GET /payments/methods — which of card / wallet / kiosk are configured. */
 export async function listMethods(_req: Request, res: Response) {
   const methods = availablePaymentMethods();
   // cardEmbedded: card fields open inside the page (the browser starts

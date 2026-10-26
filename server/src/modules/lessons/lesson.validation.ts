@@ -3,6 +3,17 @@ import { STAGES } from "../../config/constants";
 
 const slugRegex = /^[a-z0-9-]+$/;
 
+/** Optional: left empty, the server makes one from the title. */
+const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((v) => v === "" || slugRegex.test(v), {
+    message: "المسار لازم يكون إنجليزي صغير وأرقام وشرطات فقط (مثال: lesson-1)",
+  })
+  .optional()
+  .transform((v) => v || undefined);
+
 const thumbnailSchema = z
   .union([
     z.string().url(),
@@ -28,28 +39,31 @@ export const createLessonSchema = z.object({
     .trim()
     .min(3, { message: "لازم يكون 3 أحرف على الأقل" })
     .max(200, { message: "أقصى طول ٢٠٠ حرف" }),
-  slug: z
-    .string()
-    .trim()
-    .regex(slugRegex, {
-      message: "المسار لازم يكون إنجليزي صغير وأرقام وشرطات فقط (مثال: lesson-1)",
-    }),
+  slug: slugSchema,
   description: z
     .string()
     .trim()
     .min(10, { message: "لازم يكون ١٠ أحرف على الأقل" })
     .max(500, { message: "أقصى طول ٥٠٠ حرف" }),
+  // Optional: empty means the lesson page shows the short description.
   longDescription: z
     .string()
     .trim()
-    .min(10, { message: "لازم يكون ١٠ أحرف على الأقل — الحقل ده بيظهر في صفحة الدرس" })
-    .max(5000, { message: "أقصى طول ٥٠٠٠ حرف" }),
+    .max(5000, { message: "أقصى طول ٥٠٠٠ حرف" })
+    .refine((v) => v === "" || v.length >= 10, {
+      message: "لازم يكون ١٠ أحرف على الأقل — أو سيبه فاضي",
+    })
+    .default(""),
   stage: z.enum(Object.values(STAGES) as [string, ...string[]]).optional(),
   durationMinutes: z.coerce
     .number()
     .int()
     .min(1, { message: "لازم تكون دقيقة واحدة على الأقل" })
-    .max(1000, { message: "أقصى ١٠٠٠ دقيقة" }),
+    .max(1000, { message: "أقصى ١٠٠٠ دقيقة" })
+    .optional(),
+  // The duration follows the uploaded video's real length (default when no
+  // duration is given).
+  durationAuto: z.boolean().optional(),
   chapters: z.coerce
     .number()
     .int()
@@ -68,7 +82,8 @@ export const createLessonSchema = z.object({
     .default([]),
   thumbnail: thumbnailSchema,
   thumbnailGradient: z.string().nullable().optional(),
-  order: z.coerce.number().int().default(0),
+  // Left out: the lesson goes after the course's last one.
+  order: z.coerce.number().int().optional(),
 });
 
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
@@ -85,6 +100,9 @@ export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
  */
 export const togglePublishSchema = z.object({
   isPublished: z.boolean(),
+  // Publishing while the video is still being prepared: publish it by itself
+  // the moment it's ready, instead of refusing.
+  whenReady: z.boolean().optional(),
 });
 
 export type TogglePublishInput = z.infer<typeof togglePublishSchema>;
@@ -113,6 +131,19 @@ export const bulkLessonActionSchema = z
   });
 
 export type BulkLessonActionInput = z.infer<typeof bulkLessonActionSchema>;
+
+/** A course's lessons in their new order — all of them, each once. */
+export const reorderLessonsSchema = z
+  .object({
+    courseId: z.string().regex(/^[0-9a-fA-F]{24}$/, "معرف الكورس غير صالح"),
+    lessonIds: z.array(lessonObjectIdSchema).min(1).max(500),
+  })
+  .refine((v) => new Set(v.lessonIds).size === v.lessonIds.length, {
+    path: ["lessonIds"],
+    message: "قائمة الدروس بها اختيارات مكررة",
+  });
+
+export type ReorderLessonsInput = z.infer<typeof reorderLessonsSchema>;
 
 /**
  * Query parameters for listing lessons (used by both admin and students).

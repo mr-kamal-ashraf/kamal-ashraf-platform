@@ -35,9 +35,8 @@ export function LoginRequiredPopup({
           <div
             style={riseIn({ y: 0, scale: 0.92, duration: 0.2 })}
             onClick={(e) => e.stopPropagation()}
-            className="rise-in relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-elegant"
+            className="rise-in card-strata relative w-full max-w-md overflow-hidden rounded-3xl"
           >
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-brand" />
 
             <div className="p-8 text-center">
               <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">

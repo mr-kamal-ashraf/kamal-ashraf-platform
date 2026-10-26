@@ -3,6 +3,17 @@ import { STAGES } from "../../config/constants";
 
 const slugRegex = /^[a-z0-9-]+$/;
 
+/** Optional: left empty, the server makes one from the title. */
+const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((v) => v === "" || slugRegex.test(v), {
+    message: "المسار لازم يكون إنجليزي صغير وأرقام وشرطات فقط (مثال: math-full-year)",
+  })
+  .optional()
+  .transform((v) => v || undefined);
+
 const thumbnailSchema = z
   .union([
     z.string().url(),
@@ -22,22 +33,21 @@ export const createCourseSchema = z.object({
     .trim()
     .min(3, { message: "لازم يكون 3 أحرف على الأقل" })
     .max(200, { message: "أقصى طول ٢٠٠ حرف" }),
-  slug: z
-    .string()
-    .trim()
-    .regex(slugRegex, {
-      message: "المسار لازم يكون إنجليزي صغير وأرقام وشرطات فقط (مثال: math-full-year)",
-    }),
+  slug: slugSchema,
   description: z
     .string()
     .trim()
     .min(10, { message: "لازم يكون ١٠ أحرف على الأقل" })
     .max(500, { message: "أقصى طول ٥٠٠ حرف" }),
+  // Optional: empty means the course page shows the short description.
   longDescription: z
     .string()
     .trim()
-    .min(10, { message: "لازم يكون ١٠ أحرف على الأقل" })
-    .max(5000, { message: "أقصى طول ٥٠٠٠ حرف" }),
+    .max(5000, { message: "أقصى طول ٥٠٠٠ حرف" })
+    .refine((v) => v === "" || v.length >= 10, {
+      message: "لازم يكون ١٠ أحرف على الأقل — أو سيبه فاضي",
+    })
+    .default(""),
   stage: z.enum(Object.values(STAGES) as [string, ...string[]]),
   price: z.coerce
     .number()

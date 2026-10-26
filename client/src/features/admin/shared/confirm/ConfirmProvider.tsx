@@ -127,13 +127,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               exit={{ scale: 0.95, y: 24, opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-elegant"
+              className={`card-strata relative w-full max-w-md overflow-hidden rounded-3xl${
+                danger ? " card-strata-danger" : ""
+              }`}
             >
-              <span
-                className={`absolute inset-x-0 top-0 h-1 ${
-                  danger ? "bg-destructive" : "bg-gradient-brand"
-                }`}
-              />
               <div className="p-6">
                 <div className="flex items-start gap-4">
                   <div

@@ -6,13 +6,13 @@ import { toast } from "sonner";
 import { adminCoursesApi, isApiError } from "@/api";
 import type { BulkCourseAction } from "@/api/admin/courses";
 import type { CourseAdminItem, PaginatedResult, Stage } from "@/api/types";
-import { StageBadge } from "@/shared/ui/StageBadge";
 import { EmptyState } from "@/shared/ui/EmptyState";
-import { PublishStatus } from "@/features/admin/lessons/components/PublishStatus";
 import { useConfirm } from "@/features/admin/shared/confirm/ConfirmProvider";
 import { useDebounced } from "@/shared/hooks/useDebounced";
 import { STAGE_LIST } from "@/shared/lib/stage";
 import { LoadingScreen } from "@/shared/ui/LoadingScreen";
+import type { CourseRowActions } from "./courseRow";
+import { CoursesTable } from "./sections/CoursesTable";
 
 export function CoursesListView() {
   const confirm = useConfirm();
@@ -106,6 +106,16 @@ export function CoursesListView() {
       return next;
     });
   }, [allVisibleSelected, courses]);
+
+  const rowActions = useMemo<CourseRowActions>(
+    () => ({
+      onTogglePublish: (course) => void togglePublish(course),
+      onDelete: (course) => void deleteCourse(course),
+      isSelected: (courseId) => selectedCourseIds.has(courseId),
+      onToggleSelect: toggleCourseSelection,
+    }),
+    [togglePublish, deleteCourse, selectedCourseIds, toggleCourseSelection],
+  );
 
   const runBulkAction = useCallback(
     async (action: BulkCourseAction) => {
@@ -215,7 +225,7 @@ export function CoursesListView() {
       )}
 
       {/* List */}
-      {/* First load: the full loading screen; a search reload dims the cards. */}
+      {/* First load: the full loading screen; a search reload dims the rows. */}
       {isLoading && !data ? (
         <LoadingScreen variant="page" />
       ) : courses.length === 0 ? (
@@ -224,76 +234,13 @@ export function CoursesListView() {
           hint="اضغط «كورس جديد» عشان تنشئ أول كورس."
         />
       ) : (
-        <>
-          <label className="flex w-fit items-center gap-2 text-sm font-bold text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={allVisibleSelected}
-              onChange={toggleVisibleCourses}
-              className="size-4 accent-primary"
-            />
-            تحديد كل الكورسات الظاهرة
-          </label>
-          <div
-            aria-busy={isLoading}
-            className={isLoading ? "brand-loader--refreshing grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}
-          >
-          {courses.map((course) => (
-            <div
-              key={course._id}
-              className={`flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-soft ${selectedCourseIds.has(course._id) ? "border-primary/60 bg-primary/5" : "border-border"}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-extrabold text-foreground">
-                    {course.title}
-                  </h3>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                    {course.description}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PublishStatus published={course.isPublished} />
-                  <input type="checkbox" checked={selectedCourseIds.has(course._id)} onChange={() => toggleCourseSelection(course._id)} aria-label={`تحديد ${course.title}`} className="size-4 shrink-0 accent-primary" />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <StageBadge stage={course.stage} />
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
-                  {course.price > 0 ? `${course.price} ج.م` : "مجاني"}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
-                  {course.publishedLessonsCount}/{course.lessonsCount} درس
-                </span>
-              </div>
-
-              <div className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-3">
-                <Link
-                  href={`/admin/courses/${course._id}`}
-                  className="min-h-[38px] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-center text-xs font-bold text-foreground hover:bg-muted"
-                >
-                  تعديل + الدروس
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => togglePublish(course)}
-                  className="min-h-[38px] rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
-                >
-                  {course.isPublished ? "إخفاء" : "نشر"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteCourse(course)}
-                  className="min-h-[38px] rounded-lg bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-500/20"
-                >
-                  حذف
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        </>
+        <CoursesTable
+          courses={courses}
+          actions={rowActions}
+          allSelected={allVisibleSelected}
+          onToggleAll={toggleVisibleCourses}
+          refreshing={isLoading}
+        />
       )}
     </div>
   );

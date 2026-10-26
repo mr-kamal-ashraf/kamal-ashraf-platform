@@ -13,7 +13,7 @@ export interface ICourse {
   title: string;                    // display title shown to students
   slug: string;                     // URL-safe identifier (e.g. "algebra-full-year")
   description: string;              // one-line summary shown in the course card
-  longDescription: string;          // full description shown on the course detail page
+  longDescription: string;          // full description on the course page ("" → the short one)
   stage: Stage;                     // academic stage: prep3 | sec1 | sec3
   price: number;                    // price in EGP (whole pounds). 0 = free course.
   thumbnail: string | null;         // Cloudinary URL (or legacy /uploads/ path) of the cover image
@@ -38,7 +38,8 @@ const courseSchema = new Schema<ICourse>(
       match: [/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"],
     },
     description: { type: String, required: true, maxlength: 500 },
-    longDescription: { type: String, required: true, maxlength: 5000 },
+    // Empty: the course page shows the short description instead.
+    longDescription: { type: String, default: "", maxlength: 5000 },
     stage: {
       type: String,
       required: true,

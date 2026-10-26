@@ -21,6 +21,7 @@ const REASONS: Record<RefundAlert["reason"], { title: string; text: string }> = 
 const METHODS: Record<RefundAlert["method"], string> = {
   card: "كارت بنكي",
   wallet: "محفظة إلكترونية",
+  kiosk: "كاش (أمان / مصاري)",
 };
 
 /** "١٤ سبتمبر ٢٠٢٦، ٩:٣٠ م" — the time helps spot it in Paymob's list. */

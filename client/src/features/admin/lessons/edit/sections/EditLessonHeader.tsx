@@ -1,55 +1,32 @@
 "use client";
 
+import { BackLink } from "@/features/admin/shared/BackLink";
+import { LessonPublishButton } from "../../components/LessonPublishButton";
+import { PublishStatus } from "../../components/PublishStatus";
+import { VideoStatus } from "../../components/VideoStatus";
 import { useEditLesson } from "../EditLessonProvider";
 
+/** The lesson, its course (the way back), its state, and publish. */
 export function EditLessonHeader() {
-  const { lesson, togglePublish, deleteLesson } = useEditLesson();
+  const { lesson, courses, videoProgress, setLesson } = useEditLesson();
   if (!lesson) return null;
-
-  // Publishing waits for a video students can actually play (the server
-  // refuses it too).
-  const publishBlockedBy = lesson.isPublished
-    ? null
-    : !lesson.bunnyVideoId
-      ? "ارفع فيديو الدرس من الأسفل الأول، بعدها تقدر تنشره للطلاب"
-      : lesson.videoStatus === "failed"
-        ? "الفيديو فيه مشكلة ومش هيشتغل — ارفعه تاني من الأسفل"
-        : lesson.videoStatus !== "ready"
-          ? "الفيديو لسه بيتجهز — هتقدر تنشر الدرس أول ما يخلص"
-          : null;
+  const course = courses.find((c) => c._id === lesson.courseId);
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="wrap-break-word text-xl font-extrabold text-foreground sm:text-2xl">
-          تعديل: {lesson.title}
+        <BackLink href={`/admin/courses/${lesson.courseId}`}>
+          {course ? course.title : "صفحة الكورس"}
+        </BackLink>
+        <h1 className="mt-1 wrap-break-word text-xl font-extrabold text-foreground sm:text-2xl">
+          {lesson.title}
         </h1>
-        <p className="text-[11px] text-muted-foreground sm:text-xs" dir="ltr">
-          {lesson.slug}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <PublishStatus published={lesson.isPublished} />
+          <VideoStatus lesson={lesson} progress={videoProgress} />
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={togglePublish}
-          disabled={!!publishBlockedBy}
-          title={publishBlockedBy ?? undefined}
-          className={`min-h-[44px] flex-1 rounded-lg px-4 py-2 text-sm font-bold sm:flex-initial disabled:cursor-not-allowed disabled:opacity-50 ${
-            lesson.isPublished
-              ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25"
-              : "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25"
-          }`}
-        >
-          {lesson.isPublished ? "إخفاء الدرس" : "نشر الدرس"}
-        </button>
-        <button
-          type="button"
-          onClick={deleteLesson}
-          className="min-h-[44px] flex-1 rounded-lg bg-red-500/15 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-500/25 sm:flex-initial"
-        >
-          حذف الدرس
-        </button>
-      </div>
+      <LessonPublishButton lesson={lesson} onChange={setLesson} size="md" onLessonPage />
     </div>
   );
 }

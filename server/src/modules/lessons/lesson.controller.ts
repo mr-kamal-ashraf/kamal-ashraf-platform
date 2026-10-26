@@ -19,12 +19,14 @@ import type {
   UpdateLessonInput,
   ListLessonsQuery,
   BulkLessonActionInput,
+  ReorderLessonsInput,
+  TogglePublishInput,
 } from "./lesson.validation";
 import type { Stage } from "../../config/constants";
 import { recordAuditLog } from "../audit-logs/audit-log.service";
 import { AUDIT_ACTIONS } from "../audit-logs/audit-log.model";
 import { env } from "../../config/env";
-import { notifyCourseOwnersAboutPublishedLesson } from "../notifications/lesson-published.service";
+import { announcePublishedLessons } from "../notifications/lesson-published.service";
 
 function extractBunnyVideoIdFromThumbnailUrl(thumb: string): string | null {
   if (!env.BUNNY_PULL_ZONE) return null;
@@ -416,10 +418,11 @@ export async function adminUpdate(req: Request, res: Response) {
 /** PATCH /admin/lessons/:id/publish — publishes or unpublishes a lesson. */
 export async function adminTogglePublish(req: Request, res: Response) {
   if (!req.user) throw ApiError.unauthorized();
-  const isPublished = !!req.body?.isPublished;
-  const { lesson, publishedNow } = await lessonService.setLessonPublished(
+  const { isPublished, whenReady } = req.body as TogglePublishInput;
+  const { lesson, publishedNow, scheduled } = await lessonService.setLessonPublished(
     req.params.id,
     isPublished,
+    { whenReady },
   );
 
   await recordAuditLog({
@@ -428,30 +431,20 @@ export async function adminTogglePublish(req: Request, res: Response) {
       ? AUDIT_ACTIONS.PUBLISH_LESSON
       : AUDIT_ACTIONS.UNPUBLISH_LESSON,
     targetLessonId: lesson._id,
-    metadata: { title: lesson.title },
+    metadata: { title: lesson.title, ...(scheduled ? { whenVideoReady: true } : {}) },
     ipAddress: req.ip || "",
     userAgent: req.get("user-agent") || "",
   });
 
-  // A notification is sent only the FIRST time a lesson becomes public. The
-  // async job is deliberately detached from this request: publishing remains
-  // fast and succeeds even if WhatsApp is disconnected or a recipient fails.
-  if (publishedNow) {
-    const course = await Course.findById(lesson.courseId)
-      .select("title")
-      .lean();
-    if (course) {
-      void notifyCourseOwnersAboutPublishedLesson({
-        courseId: String(lesson.courseId),
-        courseTitle: course.title,
-        lessonTitle: lesson.title,
-        lessonSlug: lesson.slug,
-      });
-    }
-  }
+  // A notification is sent only the FIRST time a lesson becomes public.
+  if (publishedNow) void announcePublishedLessons([lesson]);
 
   return sendSuccess(res, {
-    message: isPublished ? "تم نشر الدرس" : "تم إخفاء الدرس",
+    message: !isPublished
+      ? "تم إخفاء الدرس"
+      : scheduled
+        ? "هيتنشر لوحده أول ما الفيديو يجهز"
+        : "تم نشر الدرس",
     data: { lesson: lesson.toJSON() },
   });
 }
@@ -492,21 +485,7 @@ export async function adminBulkAction(req: Request, res: Response) {
     })
       .select("courseId title slug")
       .lean();
-    const courseIds = [...new Set(publishedLessons.map((lesson) => String(lesson.courseId)))];
-    const courses = await Course.find({ _id: { $in: courseIds } })
-      .select("_id title")
-      .lean();
-    const courseTitles = new Map(courses.map((course) => [String(course._id), course.title]));
-    publishedLessons.forEach((lesson) => {
-      const courseTitle = courseTitles.get(String(lesson.courseId));
-      if (!courseTitle) return;
-      void notifyCourseOwnersAboutPublishedLesson({
-        courseId: String(lesson.courseId),
-        courseTitle,
-        lessonTitle: lesson.title,
-        lessonSlug: lesson.slug,
-      });
-    });
+    void announcePublishedLessons(publishedLessons);
   }
 
   return sendSuccess(res, {
@@ -516,6 +495,7 @@ export async function adminBulkAction(req: Request, res: Response) {
       processedIds: result.processedIds,
       missingIds: result.missingIds,
       failedIds: result.failedIds,
+      scheduledIds: result.scheduledIds,
     },
   });
 }
@@ -561,11 +541,37 @@ export async function adminVideoStatus(req: Request, res: Response) {
   const lesson = await lessonService.getLessonById(req.params.id);
   if (!lesson) throw ApiError.notFound("الدرس غير موجود");
   const video = await lessonService.syncLessonVideo(lesson, { force: true });
+  // Waiting to be published once ready: the page that's watching sees it go
+  // live right away, not on the next background round.
+  if (await lessonService.settleScheduledPublish(lesson, video.status)) {
+    void announcePublishedLessons([lesson]);
+  }
   return sendSuccess(res, {
     data: {
       videoStatus: video.status,
       videoDurationSeconds: video.durationSeconds,
       encodeProgress: video.encodeProgress,
+      durationMinutes: lesson.durationMinutes,
+      isPublished: lesson.isPublished,
+      publishWhenReady: lesson.publishWhenReady,
     },
   });
+}
+
+/** PUT /admin/lessons/order — a course's lessons in the order students see them. */
+export async function adminReorder(req: Request, res: Response) {
+  if (!req.user) throw ApiError.unauthorized();
+  const { courseId, lessonIds } = req.body as ReorderLessonsInput;
+  await lessonService.reorderCourseLessons(courseId, lessonIds);
+
+  await recordAuditLog({
+    adminId: req.user.id,
+    action: AUDIT_ACTIONS.UPDATE_COURSE,
+    targetCourseId: courseId,
+    metadata: { changes: ["lesson-order"] },
+    ipAddress: req.ip || "",
+    userAgent: req.get("user-agent") || "",
+  });
+
+  return sendSuccess(res, { message: "اتحفظ ترتيب الدروس", data: null });
 }

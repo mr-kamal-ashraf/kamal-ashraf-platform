@@ -30,13 +30,27 @@ import {
   createCardIntention,
   inquireTransaction,
   isEmbeddedCardEnabled,
+  payAtKiosk,
   payWithWallet,
   paymobPublicKey,
   verifyHmac,
 } from "./paymob.client";
+import {
+  kioskPreparing,
+  kioskTtlMs,
+  notifyKioskPaid,
+  sendKioskReference,
+  takeOpenKioskPayment,
+  toKioskReference,
+  type KioskReference,
+} from "./kiosk";
 
 /** Card / wallet payment keys live an hour. */
 const CHECKOUT_KEY_TTL_SECONDS = 60 * 60;
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return !!err && typeof err === "object" && (err as { code?: unknown }).code === 11000;
+}
 
 interface CheckoutResult {
   free?: boolean;
@@ -50,6 +64,8 @@ interface CheckoutResult {
   iframeUrl?: string;
   /** wallet: the wallet provider's confirmation page. */
   redirectUrl?: string;
+  /** kiosk: the reference to pay with at Aman / Masary. */
+  kiosk?: KioskReference;
   paymentToken?: string;
   amount: number;
   courseId: string;
@@ -70,7 +86,11 @@ interface CheckoutResult {
  *   - card:   with the secret + public keys set, a payment intention whose
  *             client secret renders Paymob's card fields inside our page;
  *             otherwise the iframe URL the student is redirected to;
- *   - wallet: the wallet provider page where they confirm with their PIN.
+ *   - wallet: the wallet provider page where they confirm with their PIN;
+ *   - kiosk:  a reference number to pay in cash at Aman / Masary (also sent
+ *             to their WhatsApp). Asking again while it's still offerable
+ *             returns the same reference instead of a new order, and only one
+ *             can be open per course (see kiosk.ts).
  * Every method ends at the same HMAC-verified webhook, which grants the course.
  */
 export async function createCourseCheckout(input: {
@@ -129,6 +149,18 @@ export async function createCourseCheckout(input: {
   const courseRef = { amount, courseId: String(course._id), courseSlug: course.slug };
 
   const amountCents = Math.round(amount * 100);
+  const kioskResult = (p: PaymentDocument): CheckoutResult => {
+    const kiosk = toKioskReference(p);
+    if (!kiosk) throw kioskPreparing();
+    return { method, paymentId: String(p._id), merchantOrderId: p.merchantOrderId, kiosk, ...courseRef };
+  };
+  let replacedReference: string | null = null;
+  if (method === PAYMENT_METHOD.KIOSK) {
+    const taken = await takeOpenKioskPayment(input.userId, course._id, amountCents);
+    if (taken.open) return kioskResult(taken.open);
+    replacedReference = taken.replaced;
+  }
+
   const merchantOrderId = `crs-${String(course._id)}-${nanoid(10)}`;
   const embeddedCard = method === PAYMENT_METHOD.CARD && isEmbeddedCardEnabled();
   // Fails fast (before any DB write) when the method isn't configured.
@@ -142,17 +174,33 @@ export async function createCourseCheckout(input: {
     email: `${user.studentPhone}@student.platform`,
   };
 
-  const payment = await Payment.create({
-    userId: input.userId,
-    courseId: course._id,
-    amount,
-    amountCents,
-    currency: DEFAULT_CURRENCY,
-    status: PAYMENT_STATUS.PENDING,
-    provider: "paymob",
-    method,
-    merchantOrderId,
-  });
+  const kioskTtl = kioskTtlMs();
+  let payment: PaymentDocument;
+  try {
+    payment = await Payment.create({
+      userId: input.userId,
+      courseId: course._id,
+      amount,
+      amountCents,
+      currency: DEFAULT_CURRENCY,
+      status: PAYMENT_STATUS.PENDING,
+      provider: "paymob",
+      method,
+      merchantOrderId,
+      // Set before Paymob's key is made, so ours always ends first.
+      ...(method === PAYMENT_METHOD.KIOSK
+        ? { expiresAt: new Date(Date.now() + kioskTtl) }
+        : {}),
+    });
+  } catch (err) {
+    // A second click / tab got there first: hand back that one's reference.
+    if (method === PAYMENT_METHOD.KIOSK && isDuplicateKeyError(err)) {
+      const { open } = await takeOpenKioskPayment(input.userId, course._id, amountCents);
+      if (open) return kioskResult(open);
+      throw kioskPreparing();
+    }
+    throw err;
+  }
 
   try {
     if (embeddedCard) {
@@ -191,11 +239,31 @@ export async function createCourseCheckout(input: {
       amountCents,
       orderId,
       currency: DEFAULT_CURRENCY,
-      expirationSeconds: CHECKOUT_KEY_TTL_SECONDS,
+      expirationSeconds:
+        method === PAYMENT_METHOD.KIOSK
+          ? Math.round(kioskTtl / 1000)
+          : CHECKOUT_KEY_TTL_SECONDS,
       billing,
     });
     payment.paymentKeyToken = paymentToken;
     await payment.save();
+
+    if (method === PAYMENT_METHOD.KIOSK) {
+      const kiosk = await payAtKiosk(paymentToken);
+      payment.kioskReference = kiosk.reference;
+      payment.paymobTransactionId = kiosk.transactionId;
+      await payment.save();
+      const result = kioskResult(payment);
+      // Sent once, to the student's own number — asking again shows the same
+      // reference without messaging them again.
+      sendKioskReference({
+        phone: user.studentPhone,
+        courseTitle: course.title,
+        reference: result.kiosk!,
+        replaced: replacedReference,
+      });
+      return result;
+    }
 
     if (method === PAYMENT_METHOD.WALLET) {
       const wallet = await payWithWallet(
@@ -319,20 +387,22 @@ async function settleWithTransaction(
       { $set: set },
     );
 
-  // Not decided yet (a wallet waiting for the PIN, a card at the bank's
-  // check): keep the payment open — a later callback settles it.
+  // Not decided yet (a kiosk reference waiting to be paid at an outlet, a
+  // wallet waiting for the PIN, a card at the bank's check): keep the payment
+  // open — a later callback settles it.
   if (!success && pending) {
     await recordUnlessPaid(record);
     return { ok: true, reason: "STILL_PENDING" };
   }
 
-  // Guard against a tampered/mismatched amount.
-  if (success && amountCents !== payment.amountCents) {
+  // Guard against a tampered/mismatched amount (or currency).
+  const currency = obj.currency !== undefined ? String(obj.currency) : payment.currency;
+  if (success && (amountCents !== payment.amountCents || currency !== payment.currency)) {
     await recordUnlessPaid({ ...record, status: PAYMENT_STATUS.FAILED });
     logger.error("Paymob amount mismatch", {
       origin,
-      expected: payment.amountCents,
-      got: amountCents,
+      expected: `${payment.amountCents} ${payment.currency}`,
+      got: `${amountCents} ${currency}`,
       paymentId: String(payment._id),
     });
     return { ok: false, reason: "AMOUNT_MISMATCH" };
@@ -412,6 +482,11 @@ async function settleWithTransaction(
     paymentId: String(claimed._id),
   });
 
+  // Paid at an outlet, away from the site: tell the student it's open.
+  if (claimed.method === PAYMENT_METHOD.KIOSK && granted.newlyGranted) {
+    void notifyKioskPaid(claimed.userId, claimed.courseId);
+  }
+
   return { ok: true, reason: "GRANTED" };
 }
 
@@ -422,8 +497,12 @@ async function settleWithTransaction(
 
 /** Don't ask Paymob about the same payment more than once in this window. */
 const RECHECK_AFTER_MS = 5 * 1000;
-/** Card / wallet payments are checked for this long after checkout. */
-const CHECK_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+/**
+ * Payments are checked for this long after checkout — at least three days,
+ * and a day past a kiosk reference's deadline (it can be paid up to the end).
+ */
+const checkWindowMs = () =>
+  Math.max(3 * 24 * 60 * 60 * 1000, kioskTtlMs() + 24 * 60 * 60 * 1000);
 
 /**
  * Payments worth asking Paymob about: still pending, or declined — a card
@@ -485,7 +564,7 @@ export async function reconcilePendingForCourse(
       courseId,
       status: { $in: [PAYMENT_STATUS.PENDING, PAYMENT_STATUS.FAILED] },
       paymobOrderId: { $ne: null },
-      createdAt: { $gt: new Date(Date.now() - CHECK_WINDOW_MS) },
+      createdAt: { $gt: new Date(Date.now() - checkWindowMs()) },
     })
       .sort({ createdAt: -1 })
       .limit(3);
@@ -532,9 +611,13 @@ export async function verifyPaymentForUser(input: {
   return { status: fresh?.status ?? payment.status, courseSlug: course?.slug ?? null };
 }
 
-/** Returns a student's own payment history (most recent first). */
+/**
+ * Returns a student's own payment history (most recent first) — without
+ * Paymob's raw transaction or the payment key, which are ours to keep.
+ */
 export async function listPaymentsForUser(userId: string | Types.ObjectId) {
   return Payment.find({ userId })
+    .select("-raw -paymentKeyToken -hmacVerified -checkedAt")
     .sort({ createdAt: -1 })
     .populate("courseId", "title slug stage thumbnail")
     .lean();

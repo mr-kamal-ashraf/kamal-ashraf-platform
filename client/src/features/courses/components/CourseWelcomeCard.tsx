@@ -30,10 +30,6 @@ export function CourseWelcomeCard({
 
   return (
     <>
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-1.5 bg-gradient-brand"
-      />
       <div className="relative mx-auto flex size-20 items-center justify-center rounded-full bg-primary/10 text-5xl">
         <span
           aria-hidden

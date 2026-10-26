@@ -94,7 +94,7 @@ export function LessonDetailsHero() {
               style={riseIn({ delay: 0.2, duration: 0.6 })}
               className="rise-in mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg"
             >
-              {lesson.longDescription}
+              {lesson.longDescription || lesson.description}
             </p>
 
             <div

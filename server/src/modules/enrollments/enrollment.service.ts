@@ -3,6 +3,7 @@ import { Enrollment, type EnrollmentDocument } from "./enrollment.model";
 import { Course } from "../courses/course.model";
 import { User } from "../users/user.model";
 import { ApiError } from "../../shared/utils/ApiError";
+import { withdrawOpenKioskReferences } from "../payments/kiosk";
 import {
   ENROLLMENT_SOURCE,
   ENROLLMENT_STATUS,
@@ -150,6 +151,9 @@ async function activateEnrollment(
   // keeps its date — a second payment for it isn't a new sale.
   if (newlyGranted) {
     await Enrollment.updateOne(key, { $set: { grantedAt: new Date() } });
+    // Every route that opens a course passes here: a cash reference the
+    // student still holds for it is withdrawn, and they're told not to pay it.
+    void withdrawOpenKioskReferences(input.userId, input.courseId);
   }
 
   const enrollment = await Enrollment.findOne(key);

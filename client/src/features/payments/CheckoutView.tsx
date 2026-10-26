@@ -5,7 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { coursesApi, paymentsApi, isApiError } from "@/api";
-import type { CourseDetailResponse, PaymentMethod } from "@/api/types";
+import type {
+  CourseDetailResponse,
+  KioskReference,
+  PaymentMethod,
+} from "@/api/types";
 import { useAuth } from "@/features/auth/AuthContext";
 import { RedeemCodeForm } from "@/features/courses/components/RedeemCodeForm";
 import { welcomeHref } from "@/features/courses/welcome";
@@ -22,6 +26,7 @@ import {
   CardPaymentForm,
   type CardCheckout,
 } from "./components/CardPaymentForm";
+import { KioskReferenceCard } from "./components/KioskReferenceCard";
 import { EG_PHONE, PAYMENT_METHODS } from "./methods";
 import { loadPixel } from "./pixel";
 import { LoadingScreen } from "@/shared/ui/LoadingScreen";
@@ -31,8 +36,9 @@ const START_FAILED = "معلش، حصلت مشكلة وإحنا بنبدأ ال�
 /**
  * /checkout/[slug] — the student's own checkout page: the course summary, the
  * ways to pay, and the chosen one right here — Paymob's card fields in the
- * platform's style, the wallet number, or a cash reference. Paying lands on
- * the result page, which opens the course with a welcome.
+ * platform's style, the wallet number, or a cash reference (Aman / Masary),
+ * which this page keeps checking until it's paid. Paying lands on the
+ * course with a welcome.
  */
 export function CheckoutView({ slug }: { slug: string }) {
   const router = useRouter();
@@ -49,6 +55,7 @@ export function CheckoutView({ slug }: { slug: string }) {
   const [cardBusy, setCardBusy] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
+  const [kiosk, setKiosk] = useState<KioskReference | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,10 +117,17 @@ export function CheckoutView({ slug }: { slug: string }) {
           router.replace(`/courses/${slug}`);
           return;
         }
-        const first = available.methods[0] ?? null;
+        // A cash reference they already have opens straight to it, so they
+        // pay that one instead of starting a second payment.
+        const pending = course.pendingKiosk ?? null;
+        const first =
+          pending && available.methods.includes("kiosk")
+            ? "kiosk"
+            : (available.methods[0] ?? null);
         setData(course);
         setMethods(available.methods);
         setCardEmbedded(!!available.cardEmbedded);
+        setKiosk(pending);
         setMethod(first);
         setStatus("ready");
         if (first === "card" && available.cardEmbedded) {
@@ -138,7 +152,7 @@ export function CheckoutView({ slug }: { slug: string }) {
 
   const walletPhone = phone ?? user?.studentPhone ?? "";
 
-  /** Wallet / Paymob's own card page: starts checkout and follows it. */
+  /** Wallet / kiosk / Paymob's own card page: starts checkout and follows it. */
   async function start(chosen: PaymentMethod) {
     if (!data || busy) return;
     if (chosen === "wallet" && !EG_PHONE.test(walletPhone.trim())) {
@@ -148,13 +162,29 @@ export function CheckoutView({ slug }: { slug: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await paymentsApi.checkout(data.course._id, {
-        method: chosen,
-        walletPhone: chosen === "wallet" ? walletPhone.trim() : undefined,
-      });
+      const checkout = () =>
+        paymentsApi.checkout(data.course._id, {
+          method: chosen,
+          walletPhone: chosen === "wallet" ? walletPhone.trim() : undefined,
+        });
+      let res;
+      // A reference another tab is getting right now: wait a moment for it.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          res = await checkout();
+          break;
+        } catch (err) {
+          if (!isApiError(err) || err.code !== "KIOSK_PREPARING" || attempt >= 3) throw err;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
       const url = res.redirectUrl ?? res.iframeUrl;
       if (url) {
         window.location.href = url;
+        return;
+      }
+      if (res.kiosk) {
+        setKiosk(res.kiosk);
         return;
       }
       setError(START_FAILED);
@@ -212,16 +242,13 @@ export function CheckoutView({ slug }: { slug: string }) {
     }
 
     const amount = data.course.price;
+    // The course on top, the payment under it — both the page's full width.
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <div className="space-y-5">
         <OrderSummary data={data} />
 
         <div className="space-y-4">
-          <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-elegant sm:p-7">
-            <span
-              aria-hidden
-              className="absolute inset-x-0 top-0 h-1.5 bg-gradient-brand"
-            />
+          <section className="card-strata relative rounded-3xl p-5 sm:p-7 lg:p-8">
 
             {methods.length === 0 ? (
               <p className="py-6 text-center text-sm font-semibold text-muted-foreground">
@@ -233,10 +260,11 @@ export function CheckoutView({ slug }: { slug: string }) {
                 {methods.length > 1 && (
                   <>
                     <StepTitle n={1}>اختار طريقة الدفع</StepTitle>
+                    {/* Side by side once the box is wide enough. */}
                     <div
                       role="radiogroup"
                       aria-label="طريقة الدفع"
-                      className="mt-4 space-y-2"
+                      className="mt-4 grid gap-2 sm:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] sm:gap-3"
                     >
                       {methods.map((m) => (
                         <MethodOption
@@ -250,6 +278,20 @@ export function CheckoutView({ slug }: { slug: string }) {
                     </div>
                     <div className="my-6 border-t border-dashed border-border" />
                   </>
+                )}
+
+                {kiosk && method !== "kiosk" && (
+                  <p
+                    role="note"
+                    className="mb-5 rounded-xl border border-highlight/30 bg-highlight/8 px-4 py-3 text-xs font-semibold leading-relaxed text-foreground"
+                  >
+                    عندك رقم دفع كاش مستني (
+                    <span dir="ltr" className="font-extrabold">
+                      {kiosk.reference}
+                    </span>
+                    ) — لو هتدفع بطريقة تانية، متدفعش الرقم ده عشان متدفعش
+                    مرتين.
+                  </p>
                 )}
 
                 {method === "card" && (
@@ -333,6 +375,40 @@ export function CheckoutView({ slug }: { slug: string }) {
                   </>
                 )}
 
+                {method === "kiosk" && (
+                  <>
+                    <StepTitle n={methods.length > 1 ? 2 : undefined}>
+                      الدفع كاش
+                    </StepTitle>
+                    <div className="mt-4">
+                      {kiosk ? (
+                        <KioskReferenceCard
+                          reference={kiosk}
+                          courseSlug={slug}
+                          onPaid={(paidSlug) =>
+                            router.replace(welcomeHref(paidSlug ?? slug))
+                          }
+                          onRenew={() => void start("kiosk")}
+                          renewing={busy}
+                        />
+                      ) : (
+                        <>
+                          <p className="text-sm leading-relaxed text-muted-foreground">
+                            هتاخد رقم دفع، وتدفع بيه كاش في أي محل عليه علامة
+                            أمان أو مصاري. الكورس بيتفتحلك تلقائي أول ما تدفع،
+                            والرقم هيوصلك كمان على الواتساب.
+                          </p>
+                          <PayButton
+                            busy={busy}
+                            onClick={() => void start("kiosk")}
+                            label={`اطلع رقم الدفع (${amount} ج.م)`}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 {error && (
                   <p
                     role="alert"
@@ -383,77 +459,79 @@ export function CheckoutView({ slug }: { slug: string }) {
   );
 }
 
-/** The course being bought: compact on phones, a full card beside the form on desktop. */
+/**
+ * The course being bought, as a wide card above the payment: the cover on
+ * one side, the course in the middle, and the total on the other side (under
+ * the course on phones, where it stays compact so the payment isn't pushed
+ * far down).
+ */
 function OrderSummary({ data }: { data: CourseDetailResponse }) {
   const { course, lessons } = data;
   const thumb = resolveAssetUrl(course.thumbnail);
   const minutes = lessons.reduce((sum, l) => sum + l.durationMinutes, 0);
 
   return (
-    <aside className="lg:sticky lg:top-28 lg:order-last">
-      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
-        <div className="flex gap-4 p-4 lg:block lg:p-0">
-          <div
-            className="relative flex aspect-video w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl sm:w-36 lg:w-full lg:rounded-none"
-            style={{
-              background: getLessonGradient(
-                course.stage,
-                course.thumbnailGradient,
-              ),
-            }}
-          >
-            {thumb ? (
-              <Image
-                src={thumb}
-                alt=""
-                fill
-                sizes="(min-width: 1024px) 380px, 144px"
-                unoptimized={!isOptimizable(thumb)}
-                className="object-cover"
-              />
-            ) : (
-              <CoverArt
-                seed={course.slug}
-                glyphClassName="size-12 lg:size-24"
-              />
-            )}
-          </div>
-          <div className="min-w-0 flex-1 lg:p-5">
+    <section
+      aria-label="الكورس اللي هتشتريه"
+      className="card-strata overflow-hidden rounded-3xl"
+    >
+      <div className="flex items-stretch gap-4 p-4 sm:gap-6 sm:p-5">
+        <div
+          className="relative flex aspect-video w-28 shrink-0 items-center justify-center self-center overflow-hidden rounded-xl sm:w-52 sm:rounded-2xl lg:w-64"
+          style={{
+            background: getLessonGradient(course.stage, course.thumbnailGradient),
+          }}
+        >
+          {thumb ? (
+            <Image
+              src={thumb}
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 256px, (min-width: 640px) 208px, 112px"
+              unoptimized={!isOptimizable(thumb)}
+              className="object-cover"
+            />
+          ) : (
+            <CoverArt seed={course.slug} glyphClassName="size-12 sm:size-20" />
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
+          <div className="min-w-0">
             <StageBadge stage={course.stage} />
-            <h2 className="mt-2 line-clamp-2 text-sm font-extrabold text-foreground sm:text-base lg:text-lg">
+            <h2 className="mt-2 line-clamp-2 text-sm font-extrabold text-foreground sm:text-lg lg:text-xl">
               {course.title}
             </h2>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
               <BioIcon name="book" className="size-3.5" strokeWidth={2.5} />
               {lessons.length} درس
               {minutes > 0 && <> · {minutes} دقيقة شرح</>}
             </p>
-            <p className="mt-2 text-base font-extrabold text-primary lg:hidden">
+            <p className="mt-2 text-base font-extrabold text-primary sm:hidden">
               {course.price} ج.م
             </p>
           </div>
-        </div>
 
-        <div className="hidden border-t border-border px-5 py-4 lg:block">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>سعر الكورس</span>
-            <span>{course.price} ج.م</span>
+          <div className="hidden shrink-0 rounded-2xl border border-dashed border-border bg-background/60 px-5 py-4 sm:block md:w-64">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>سعر الكورس</span>
+              <span>{course.price} ج.م</span>
+            </div>
+            <div className="mt-2.5 flex items-center justify-between border-t border-dashed border-border pt-2.5">
+              <span className="text-sm font-extrabold text-foreground">الإجمالي</span>
+              <span className="text-xl font-extrabold text-primary">
+                {course.price} ج.م
+              </span>
+            </div>
           </div>
-          <div className="mt-3 flex items-center justify-between border-t border-dashed border-border pt-3">
-            <span className="text-sm font-extrabold text-foreground">
-              الإجمالي
-            </span>
-            <span className="text-xl font-extrabold text-primary">
-              {course.price} ج.م
-            </span>
-          </div>
-          <p className="mt-4 flex items-center gap-2 rounded-xl bg-primary/6 px-3 py-2.5 text-xs font-semibold text-foreground">
-            <BioIcon name="spark" className="size-4 shrink-0 text-primary" />
-            الكورس بيتفتحلك تلقائي أول ما الدفع يتم.
-          </p>
         </div>
       </div>
-    </aside>
+
+      <p className="hidden items-center gap-2 border-t border-border bg-primary/5 px-5 py-2.5 text-xs font-semibold text-foreground sm:flex">
+        <BioIcon name="spark" className="size-4 shrink-0 text-primary" />
+        الكورس بيتفتحلك تلقائي أول ما الدفع يتم.
+      </p>
+    </section>
   );
 }
 

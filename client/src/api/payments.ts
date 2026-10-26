@@ -3,7 +3,7 @@ import type { CheckoutResponse, PaymentMethod, PaymentRecord } from "./types";
 
 export const paymentsApi = {
   /**
-   * Which of card / wallet this platform offers, and whether card
+   * Which of card / wallet / kiosk this platform offers, and whether card
    * fields open inside the page (Paymob Pixel) rather than on Paymob's page.
    */
   methods: () =>
@@ -13,7 +13,8 @@ export const paymentsApi = {
 
   /**
    * Start buying a course with a method: card fields to embed or a Paymob
-   * page URL (card / wallet), or free:true.
+   * page URL (card / wallet), a reference to pay in cash (kiosk — the same
+   * one again while it's still payable), or free:true.
    * No method = card.
    */
   checkout: (

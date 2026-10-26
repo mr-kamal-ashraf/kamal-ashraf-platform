@@ -17,9 +17,8 @@ export function CourseCardPublic({ course }: { course: CourseCard }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-brand"
+      className="card-strata card-strata-hover group relative flex flex-col overflow-hidden rounded-3xl hover:border-primary/40"
     >
-      <span className="absolute inset-x-0 top-0 z-20 h-1 bg-gradient-brand" />
 
       <div
         className="relative aspect-video overflow-hidden"
