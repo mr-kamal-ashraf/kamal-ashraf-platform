@@ -21,14 +21,14 @@ if (env.DNS_SERVERS) {
 
 /**
  * Opens the Mongoose connection to MongoDB.
- * autoIndex is disabled in production to avoid rebuild overhead on startup;
- * indexes should be created manually in prod.
+ * autoIndex is off everywhere: the server creates every declared index itself
+ * at startup (config/indexes.ts), the same way in development and production.
  * family: 4 forces IPv4 to avoid issues on systems that prefer IPv6.
  */
 export async function connectDatabase(): Promise<void> {
   try {
     await mongoose.connect(env.MONGODB_URI, {
-      autoIndex: env.NODE_ENV !== "production",  // build indexes in dev/test only
+      autoIndex: false,                           // see config/indexes.ts
       serverSelectionTimeoutMS: 15000,            // fail fast if MongoDB is unreachable
       family: 4,                                  // force IPv4
     });

@@ -4,9 +4,7 @@ import { connectDatabase, disconnectDatabase } from "./config/database";
 import { logger } from "./shared/utils/logger";
 import { seedAdmin } from "./seeds/seedAdmin";
 import { callRegisterPlatform } from "./modules/ai/ai.service";
-import { ensureAiJobIndexes } from "./modules/ai/ai-job.model";
-import { ensurePaymentIndexes } from "./modules/payments/payment.model";
-import { ensureLessonIndexes } from "./modules/lessons/lesson.model";
+import { ensureIndexes } from "./config/indexes";
 import {
   startLessonPublishWatcher,
   stopLessonPublishWatcher,
@@ -35,18 +33,9 @@ async function bootstrap() {
     await connectDatabase();
     // Creates the admin user from .env if the collection is empty.
     await seedAdmin();
-    // The TTL index that clears finished AI jobs (autoIndex is off in production).
-    await ensureAiJobIndexes().catch((error) =>
-      logger.error("Could not create the AI jobs TTL index", { error }),
-    );
-    // One open kiosk reference per student per course (autoIndex is off in production).
-    await ensurePaymentIndexes().catch((error) =>
-      logger.error("Could not create the payment indexes", { error }),
-    );
-    // Finds the lessons waiting to be published once their video is ready.
-    await ensureLessonIndexes().catch((error) =>
-      logger.error("Could not create the lesson indexes", { error }),
-    );
+    // Every index the models declare (unique rules, lookups, TTLs) — before
+    // the first request. One that can't be made is logged; startup goes on.
+    await ensureIndexes();
 
     const app = createApp();
 

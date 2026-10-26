@@ -90,20 +90,12 @@ lessonSchema.index({ stage: 1, isPublished: 1, order: 1 });
 // Compound index for listing a course's lessons in order.
 lessonSchema.index({ courseId: 1, order: 1 });
 
-/** The few lessons waiting to be published once their video is ready. */
-const WAITING_TO_PUBLISH = {
-  keys: { publishWhenReady: 1 },
-  options: {
-    name: "waiting_to_publish",
-    partialFilterExpression: { publishWhenReady: { $type: "date" } },
-  },
-} as const;
-lessonSchema.index(WAITING_TO_PUBLISH.keys, WAITING_TO_PUBLISH.options);
+// The few lessons waiting to be published once their video is ready.
+lessonSchema.index(
+  { publishWhenReady: 1 },
+  { name: "waiting_to_publish", partialFilterExpression: { publishWhenReady: { $type: "date" } } },
+);
 
 export const Lesson: Model<ILesson> =
   mongoose.models.Lesson || mongoose.model<ILesson>("Lesson", lessonSchema);
 
-/** Creates the waiting-to-publish index (autoIndex is off in production). */
-export async function ensureLessonIndexes(): Promise<void> {
-  await Lesson.collection.createIndex(WAITING_TO_PUBLISH.keys, WAITING_TO_PUBLISH.options);
-}

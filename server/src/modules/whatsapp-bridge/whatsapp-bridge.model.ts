@@ -86,18 +86,6 @@ export const WhatsappOutboundMessage = model<IWhatsappOutboundMessage>(
 );
 
 /**
- * Production disables Mongoose autoIndex at startup, so create the TTL index
- * explicitly when the bridge starts. createIndex is idempotent when the index
- * already exists and keeps the retry store bounded after deployments as well.
- */
-export async function ensureWhatsappOutboundMessageIndexes(): Promise<void> {
-  await WhatsappOutboundMessage.collection.createIndex(
-    { expiresAt: 1 },
-    { name: "expiresAt_1", expireAfterSeconds: 0 },
-  );
-}
-
-/**
  * Teacher-controlled WhatsApp settings. A single document (`_id: "main"`) — one
  * linked number per backend deployment, like the session store above.
  *

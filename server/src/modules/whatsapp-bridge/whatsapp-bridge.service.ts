@@ -16,7 +16,6 @@ import {
   WhatsappOutboundMessage,
   WhatsappSettings,
   WHATSAPP_SETTINGS_ID,
-  ensureWhatsappOutboundMessageIndexes,
 } from "./whatsapp-bridge.model";
 
 // ── ESM-from-CommonJS loader ──────────────────────────────────────────────────
@@ -675,17 +674,6 @@ export async function initWhatsappBridge(): Promise<void> {
     return;
   }
 
-  // The retry-message TTL index is essential in production too, where the
-  // general Mongoose autoIndex setting is intentionally off.
-  try {
-    await ensureWhatsappOutboundMessageIndexes();
-  } catch (err) {
-    // Keep the bridge available if Mongo is temporarily unavailable; outgoing
-    // messages still have the in-memory retry cache for this process.
-    logger.error("[whatsapp-bridge] could not ensure outbound-message TTL index", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
   muteSignalConsoleNoise();
   stopped = false;
   state.status = "init";

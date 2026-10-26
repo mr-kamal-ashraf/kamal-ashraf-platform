@@ -58,18 +58,10 @@ const aiJobSchema = new Schema<IAiJob>(
 );
 
 aiJobSchema.index({ ownerId: 1, kind: 1, createdAt: -1 });
+// Finished jobs are cleared by MongoDB once expiresAt passes.
+aiJobSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const AiJob: Model<IAiJob> =
   mongoose.models.AiJob ||
   mongoose.model<IAiJob>("AiJob", aiJobSchema, "ai_jobs");
 
-/**
- * Production turns Mongoose's autoIndex off, so the TTL index that clears old
- * jobs is created explicitly at startup (idempotent, like the WhatsApp one).
- */
-export async function ensureAiJobIndexes(): Promise<void> {
-  await AiJob.collection.createIndex(
-    { expiresAt: 1 },
-    { name: "expiresAt_1", expireAfterSeconds: 0 },
-  );
-}

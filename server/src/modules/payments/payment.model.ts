@@ -119,15 +119,14 @@ paymentSchema.index({ userId: 1, courseId: 1, status: 1 });
 // At most ONE open kiosk reference per student per course: two quick clicks
 // (or two tabs) can't each get a number to pay. A reference we stop offering
 // is moved off "pending" first (see payment.service).
-const ONE_OPEN_KIOSK_REFERENCE = {
-  keys: { userId: 1, courseId: 1 },
-  options: {
+paymentSchema.index(
+  { userId: 1, courseId: 1 },
+  {
     name: "one_open_kiosk_reference",
     unique: true,
     partialFilterExpression: { method: PAYMENT_METHOD.KIOSK, status: PAYMENT_STATUS.PENDING },
   },
-} as const;
-paymentSchema.index(ONE_OPEN_KIOSK_REFERENCE.keys, ONE_OPEN_KIOSK_REFERENCE.options);
+);
 // The teacher's "refund these" list: only the few flagged payments are indexed.
 paymentSchema.index(
   { refundResolvedAt: 1, paidAt: -1 },
@@ -138,14 +137,3 @@ export const Payment: Model<IPayment> =
   mongoose.models.Payment ||
   mongoose.model<IPayment>("Payment", paymentSchema);
 
-/**
- * Production turns Mongoose's autoIndex off, and the one-open-kiosk-reference
- * guard is a correctness rule, not a speed-up — so it's created explicitly at
- * startup (idempotent).
- */
-export async function ensurePaymentIndexes(): Promise<void> {
-  await Payment.collection.createIndex(
-    ONE_OPEN_KIOSK_REFERENCE.keys,
-    ONE_OPEN_KIOSK_REFERENCE.options,
-  );
-}
